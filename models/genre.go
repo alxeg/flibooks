@@ -1,6 +1,6 @@
 package models
 
 type Genre struct {
-    ID        int
+    ID        int    `json:"-"`
     GenreCode string `json:"genre_code" sql:"not null;unique_index"`
 }

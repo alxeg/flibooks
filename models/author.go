@@ -1,10 +1,6 @@
 package models
 
-import (
-    _ "github.com/alxeg/flibooks/utils"
-)
-
 type Author struct {
-    ID   int
+    ID   int    `json:"-"`
     Name string `json:"name" sql:"not null;unique_index"`
 }
