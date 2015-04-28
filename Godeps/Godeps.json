@@ -1,0 +1,24 @@
+{
+	"ImportPath": "github.com/alxeg/flibooks",
+	"GoVersion": "go1.4.2",
+	"Deps": [
+		{
+			"ImportPath": "github.com/jinzhu/gorm",
+			"Rev": "3c2915a9dfaaeaeb1e049436ae9291f5e84c95fa"
+		},
+		{
+			"ImportPath": "github.com/lib/pq/hstore",
+			"Comment": "go1.0-cutoff-40-g8910d1c",
+			"Rev": "8910d1c3a4bda5c97c50bc38543953f1f1e1f8bb"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-sqlite3",
+			"Rev": "542ae647f8601bafd96233961b150cae198e0295"
+		},
+		{
+			"ImportPath": "github.com/ogier/pflag",
+			"Comment": "v0.0.1-2-g2e6f5f3",
+			"Rev": "2e6f5f3f0c40ab9cb459742296f6a2aaab1fd5dc"
+		}
+	]
+}
