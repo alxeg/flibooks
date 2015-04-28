@@ -5,8 +5,8 @@ import (
 )
 
 type DataStorer interface {
-    PutBook(models.Book) error
-    FindBooksByTitle(title string) ([]models.Book, error)
-    FindBooksByAuthor(author string) ([]models.Book, error)
+    PutBook(*models.Book) error
+    FindBooksByTitle(title string, limit uint) ([]models.Book, error)
+    FindBooksByAuthor(author string, limit uint) ([]models.Book, error)
     Close()
 }

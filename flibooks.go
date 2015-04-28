@@ -1,6 +1,8 @@
 package main
 
 import (
+    "encoding/json"
+    "fmt"
     "github.com/alxeg/flibooks/datastore"
     "github.com/alxeg/flibooks/inpx"
     flag "github.com/ogier/pflag"
@@ -14,6 +16,7 @@ var (
     dataDir      string
     searchTitle  string
     searchAuthor string
+    limit        uint
 )
 
 func init() {
@@ -21,7 +24,7 @@ func init() {
     flag.StringVar(&dataDir, "data-dir", "", "Folder to put database files")
     flag.StringVar(&searchTitle, "search-title", "", "Search books by their title")
     flag.StringVar(&searchAuthor, "search-author", "", "Search books by author")
-
+    flag.UintVar(&limit, "limit", 10, "Limit output results")
 }
 
 func main() {
@@ -40,9 +43,14 @@ func main() {
         log.Printf("Opening %s to parse data\n", fileToParse)
         inpx.ReadInpxFile(fileToParse, store)
     } else if searchTitle != "" {
-        result, err := store.FindBooksByTitle(searchTitle)
-        if err == nil {
-            log.Println(result)
+        result, err := store.FindBooksByTitle(searchTitle, limit)
+        if err == nil && len(result) != 0 {
+            jsonBytes, err := json.MarshalIndent(result, "", "  ")
+            if err == nil {
+                fmt.Println(string(jsonBytes))
+            } else {
+                log.Fatalln("Invalid object")
+            }
         } else {
             log.Println("Nothing found")
         }

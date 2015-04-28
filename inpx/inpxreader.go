@@ -27,7 +27,7 @@ func ReadInpxFile(dataFile string, store datastore.DataStorer) (err error) {
 
     files := make(chan *zip.File, 10)
     done := make(chan struct{})
-    results := make(chan models.Book, 10)
+    results := make(chan *models.Book, 10)
 
     go func() {
         for _, file := range r.File {
@@ -48,7 +48,7 @@ func ReadInpxFile(dataFile string, store datastore.DataStorer) (err error) {
     return nil
 }
 
-func processInp(files <-chan *zip.File, results chan<- models.Book, done chan<- struct{}) {
+func processInp(files <-chan *zip.File, results chan<- *models.Book, done chan<- struct{}) {
 
     defer func() {
         done <- struct{}{}
@@ -101,13 +101,13 @@ func trimSlice(in []string) []string {
     return in
 }
 
-func processBook(line string) (result models.Book, err error) {
+func processBook(line string) (book *models.Book, err error) {
     elements := strings.Split(line, string([]byte{0x04}))
     if len(elements) < 12 {
-        return result, fmt.Errorf("Illegal number of elements")
+        return book, fmt.Errorf("Illegal number of elements")
     }
 
-    book := models.Book{}
+    book = new(models.Book)
     for _, author := range trimSlice(strings.Split(elements[0], ":")) {
         book.Authors = append(book.Authors, models.Author{Name: strings.ToLower(author)})
     }
@@ -126,7 +126,7 @@ func processBook(line string) (result models.Book, err error) {
     return book, nil
 }
 
-func waitAndProcessResults(done <-chan struct{}, results <-chan models.Book, store datastore.DataStorer) {
+func waitAndProcessResults(done <-chan struct{}, results <-chan *models.Book, store datastore.DataStorer) {
     for working := numProcesses; working > 0; {
         select {
         case book := <-results:
