@@ -16,15 +16,21 @@ var (
     dataDir      string
     searchTitle  string
     searchAuthor string
-    limit        uint
+    listAuthor   uint
+    limit        int
+    getBook      uint
+    save         bool
 )
 
 func init() {
     flag.StringVar(&fileToParse, "parse", "", "Parse inpx to the local database")
     flag.StringVar(&dataDir, "data-dir", "", "Folder to put database files")
     flag.StringVar(&searchTitle, "search-title", "", "Search books by their title")
-    flag.StringVar(&searchAuthor, "search-author", "", "Search books by author")
-    flag.UintVar(&limit, "limit", 10, "Limit output results")
+    flag.StringVar(&searchAuthor, "search-author", "", "Search authors, or books by author if comes with search-title")
+    flag.IntVar(&limit, "limit", 10, "Limit search results (-1 for no limit)")
+    flag.UintVar(&listAuthor, "list-author", 0, "List all author's books by id")
+    flag.UintVar(&getBook, "get-book", 0, "Get book by its id")
+    flag.BoolVar(&save, "save", false, "Save book file to the disk")
 }
 
 func printJson(object interface{}) {
@@ -59,6 +65,34 @@ func main() {
         } else {
             log.Println("Nothing found")
         }
+    } else if searchAuthor != "" {
+        result, err := store.FindAuthors(searchAuthor, limit)
+        if err == nil && len(result) != 0 {
+            printJson(result)
+        } else {
+            log.Println("Noone found")
+        }
+    } else if listAuthor > 0 {
+        result, err := store.ListAuthorBooks(listAuthor)
+        if err == nil && len(result) != 0 {
+            printJson(result)
+        } else {
+            log.Println("Nothing found")
+        }
+    } else if getBook > 0 {
+        result, err := store.GetBook(getBook)
+        if err == nil {
+            printJson(result)
+            if save {
+                err = inpx.UnzipBookFile(result, dataDir, true)
+                if err != nil {
+                    log.Fatalln("Failed to save file", err)
+                }
+            }
+        } else {
+            log.Println("Nothing found")
+        }
+
     } else {
         flag.PrintDefaults()
     }

@@ -5,9 +5,9 @@ import (
 )
 
 type Book struct {
-    ID          int
+    ID          uint      `gorm:"primary_key"`
     Container   Container `json:"container"`
-    ContainerID int       `json:"-"`
+    ContainerID uint      `json:"-"`
     Authors     []Author  `json:"authors" gorm:"many2many:book_authors;"`
     Genres      []Genre   `json:"genres"  gorm:"many2many:book_genres;"`
     Title       string    `json:"title"`

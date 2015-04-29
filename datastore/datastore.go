@@ -1,6 +1,7 @@
 package datastore
 
 import (
+    "fmt"
     "github.com/alxeg/flibooks/models"
     "github.com/alxeg/flibooks/utils"
     "github.com/jinzhu/gorm"
@@ -41,34 +42,71 @@ func (store *dbStore) PutBook(book *models.Book) (err error) {
     return err
 }
 
-func (store *dbStore) FindBooks(title string, authors string, limit uint) ([]models.Book, error) {
+func (store *dbStore) fillBookDetails(book *models.Book) {
+    store.db.Select("authors.*").Model(book).Related(&book.Authors, "Authors")
+    for j, a := range book.Authors {
+        book.Authors[j].Name = utils.UpperInitialAll(a.Name)
+    }
+    store.db.Select("genres.*").Model(book).Related(&book.Genres, "Genres")
+}
+
+func (store *dbStore) fillBooksDetails(books []models.Book) []models.Book {
+    for i, _ := range books {
+        store.fillBookDetails(&books[i])
+    }
+
+    return books
+}
+
+func (store *dbStore) FindBooks(title string, authors string, limit int) ([]models.Book, error) {
 
     result := []models.Book{}
-    search := store.db.Table("books").Joins("left outer join book_authors on books.id=book_authors.book_id left outer join authors on authors.id=book_authors.author_id")
+    search := store.db.Select("books.*").Table("books").Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
     for _, term := range utils.SplitBySeparators(strings.ToLower(title)) {
         search = search.Where("title LIKE ?", "%"+term+"%")
     }
     for _, term := range utils.SplitBySeparators(strings.ToLower(authors)) {
         search = search.Where("name LIKE ?", "%"+term+"%")
     }
-    search.Preload("Container").Order("title").Limit(limit).Find(&result)
+    if limit > 0 {
+        search = search.Limit(limit)
+    }
+    search.Preload("Container").Order("title").Find(&result)
 
-    for i, book := range result {
-        store.db.Model(&book).Related(&book.Authors, "Authors")
-        for j, a := range book.Authors {
-            book.Authors[j].Name = utils.UpperInitialAll(a.Name)
-        }
-        result[i].Authors = book.Authors
-        store.db.Model(&book).Related(&book.Genres, "Genres")
-        result[i].Genres = book.Genres
+    result = store.fillBooksDetails(result)
+    return result, nil
+}
+
+func (store *dbStore) FindAuthors(author string, limit int) ([]models.Author, error) {
+    result := []models.Author{}
+    search := store.db.Order("name")
+    if limit > 0 {
+        search = search.Limit(limit)
+    }
+    search.Find(&result)
+    for i, a := range result {
+        result[i].Name = utils.UpperInitialAll(a.Name)
     }
     return result, nil
 }
 
-func (store *dbStore) FindAuthors(author string, limit uint) ([]models.Author, error) {
-    result := []models.Author{}
-
+func (store *dbStore) ListAuthorBooks(authorId uint) ([]models.Book, error) {
+    result := []models.Book{}
+    search := store.db.Select("books.*").Table("books").Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
+    search.Where("authors.ID=?", authorId).Preload("Container").Order("title").Find(&result)
+    result = store.fillBooksDetails(result)
     return result, nil
+}
+
+func (store *dbStore) GetBook(bookId uint) (*models.Book, error) {
+    result := new(models.Book)
+    store.db.Preload("Container").First(result, bookId)
+    store.fillBookDetails(result)
+    if result.ID > 0 {
+        return result, nil
+    } else {
+        return nil, fmt.Errorf("No book found")
+    }
 }
 
 func (store *dbStore) Close() {

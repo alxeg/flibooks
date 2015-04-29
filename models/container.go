@@ -1,6 +1,6 @@
 package models
 
 type Container struct {
-    ID       int    `json:"-"`
+    ID       uint   `json:"-" gorm:"primary_key"`
     FileName string `json:"file_name" sql:"not null;unique_index"`
 }
