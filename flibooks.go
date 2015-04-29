@@ -27,6 +27,16 @@ func init() {
     flag.UintVar(&limit, "limit", 10, "Limit output results")
 }
 
+func printJson(object interface{}) {
+    jsonBytes, err := json.MarshalIndent(object, "", "  ")
+    if err == nil {
+        fmt.Println(string(jsonBytes))
+    } else {
+        log.Fatalln("Invalid object")
+    }
+
+}
+
 func main() {
     flag.Parse()
 
@@ -43,14 +53,9 @@ func main() {
         log.Printf("Opening %s to parse data\n", fileToParse)
         inpx.ReadInpxFile(fileToParse, store)
     } else if searchTitle != "" {
-        result, err := store.FindBooksByTitle(searchTitle, limit)
+        result, err := store.FindBooks(searchTitle, searchAuthor, limit)
         if err == nil && len(result) != 0 {
-            jsonBytes, err := json.MarshalIndent(result, "", "  ")
-            if err == nil {
-                fmt.Println(string(jsonBytes))
-            } else {
-                log.Fatalln("Invalid object")
-            }
+            printJson(result)
         } else {
             log.Println("Nothing found")
         }

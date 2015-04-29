@@ -41,13 +41,18 @@ func (store *dbStore) PutBook(book *models.Book) (err error) {
     return err
 }
 
-func (store *dbStore) FindBooksByTitle(title string, limit uint) ([]models.Book, error) {
+func (store *dbStore) FindBooks(title string, authors string, limit uint) ([]models.Book, error) {
+
     result := []models.Book{}
-    search := store.db.Order("title")
-    for _, term := range utils.SplitBySeparators(title) {
-        search = search.Where("title LIKE ?", "%"+strings.ToLower(term)+"%")
+    search := store.db.Table("books").Joins("left outer join book_authors on books.id=book_authors.book_id left outer join authors on authors.id=book_authors.author_id")
+    for _, term := range utils.SplitBySeparators(strings.ToLower(title)) {
+        search = search.Where("title LIKE ?", "%"+term+"%")
     }
-    search.Preload("Container").Limit(limit).Find(&result)
+    for _, term := range utils.SplitBySeparators(strings.ToLower(authors)) {
+        search = search.Where("name LIKE ?", "%"+term+"%")
+    }
+    search.Preload("Container").Order("title").Limit(limit).Find(&result)
+
     for i, book := range result {
         store.db.Model(&book).Related(&book.Authors, "Authors")
         for j, a := range book.Authors {
@@ -60,8 +65,8 @@ func (store *dbStore) FindBooksByTitle(title string, limit uint) ([]models.Book,
     return result, nil
 }
 
-func (store *dbStore) FindBooksByAuthor(author string, limit uint) ([]models.Book, error) {
-    result := []models.Book{}
+func (store *dbStore) FindAuthors(author string, limit uint) ([]models.Author, error) {
+    result := []models.Author{}
 
     return result, nil
 }
@@ -80,7 +85,7 @@ func NewDBStore(dbPath string, reset bool) (DataStorer, error) {
     if err == nil {
         db.DB()
         db.AutoMigrate(&models.Author{}, &models.Container{}, &models.Genre{}, &models.Book{})
-        // db.LogMode(true)
+        db.LogMode(true)
     }
     result := new(dbStore)
     result.db = db
