@@ -80,6 +80,9 @@ func (store *dbStore) FindBooks(title string, authors string, limit int) ([]mode
 func (store *dbStore) FindAuthors(author string, limit int) ([]models.Author, error) {
     result := []models.Author{}
     search := store.db.Order("name")
+    for _, term := range utils.SplitBySeparators(strings.ToLower(author)) {
+        search = search.Where("name LIKE ?", "%"+term+"%")
+    }
     if limit > 0 {
         search = search.Limit(limit)
     }
@@ -123,7 +126,7 @@ func NewDBStore(dbPath string, reset bool) (DataStorer, error) {
     if err == nil {
         db.DB()
         db.AutoMigrate(&models.Author{}, &models.Container{}, &models.Genre{}, &models.Book{})
-        db.LogMode(true)
+        // db.LogMode(true)
     }
     result := new(dbStore)
     result.db = db
