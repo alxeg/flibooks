@@ -5,6 +5,7 @@ import (
     "fmt"
     "github.com/alxeg/flibooks/datastore"
     "github.com/alxeg/flibooks/inpx"
+    "github.com/alxeg/flibooks/rest"
     flag "github.com/ogier/pflag"
     "log"
     "os"
@@ -20,6 +21,7 @@ var (
     limit        int
     getBook      uint
     save         bool
+    listen       string
 )
 
 func init() {
@@ -31,6 +33,8 @@ func init() {
     flag.UintVar(&listAuthor, "list-author", 0, "List all author's books by id")
     flag.UintVar(&getBook, "get-book", 0, "Get book by its id")
     flag.BoolVar(&save, "save", false, "Save book file to the disk")
+    flag.StringVar(&listen, "listen", ":8000", "Set server listen address:port")
+
 }
 
 func printJson(object interface{}) {
@@ -94,6 +98,8 @@ func main() {
         }
 
     } else {
+        fmt.Println("Additional parameters are:")
         flag.PrintDefaults()
+        rest.NewRestService(listen, store).StartListen()
     }
 }
