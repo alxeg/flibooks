@@ -8,12 +8,18 @@ import (
 )
 
 const (
-    RE_NOT_SEPARATORS = `[^[\s\.,:\*\+;\?\\\-—_\(\)\[\]{}<>'"#«»№\/!]+`
+    RE_NOT_SEPARATORS    = `[^[\s\.,:\*\+;\?\\\-—_\(\)\[\]{}<>'"#«»№\/!]+`
+    RE_UNSUPPORTED_CHARS = `[\\\/\*\+\?]`
 )
 
 var (
-    re = regexp.MustCompile(RE_NOT_SEPARATORS)
+    re_split = regexp.MustCompile(RE_NOT_SEPARATORS)
+    re_unsup = regexp.MustCompile(RE_UNSUPPORTED_CHARS)
 )
+
+func ReplaceUnsupported(str string) string {
+    return re_unsup.ReplaceAllString(str, "_")
+}
 
 func UpperInitial(str string) string {
     if len(str) > 0 {
@@ -25,11 +31,11 @@ func UpperInitial(str string) string {
 }
 
 func UpperInitialAll(src string) string {
-    return re.ReplaceAllStringFunc(src, func(str string) string {
+    return re_split.ReplaceAllStringFunc(src, func(str string) string {
         return UpperInitial(str)
     })
 }
 
 func SplitBySeparators(src string) []string {
-    return re.FindAllString(src, -1)
+    return re_split.FindAllString(src, -1)
 }
