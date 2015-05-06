@@ -49,6 +49,29 @@ func (service RestService) registerBookResource(container *restful.Container) {
     container.Add(ws)
 }
 
+func (service RestService) registerAuthorResource(container *restful.Container) {
+    ws := new(restful.WebService)
+    ws.
+        Path("/author").
+        Consumes(restful.MIME_JSON).
+        Produces(restful.MIME_JSON)
+
+    ws.Route(ws.GET("/{authorId}/books").
+        To(service.listAuthorsBooks).
+        Doc("Show author's books").
+        Operation("listAuthorsBooks").
+        Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
+        Returns(200, "OK", []models.Book{}))
+
+    ws.Route(ws.POST("/search").
+        To(service.searchAuthors).
+        Doc("Search authors").
+        Operation("searchAuthors").
+        Returns(200, "OK", []models.Author{}))
+
+    container.Add(ws)
+}
+
 func (service RestService) getBook(request *restful.Request, response *restful.Response) {
     bookId, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
     log.Println("Requesting ", bookId)
@@ -95,6 +118,30 @@ func (service RestService) searchBooks(request *restful.Request, response *restf
     }
 }
 
+func (service RestService) searchAuthors(request *restful.Request, response *restful.Response) {
+    search := models.Search{}
+    request.ReadEntity(&search)
+
+    result, err := service.dataStore.FindAuthors(search.Author, search.Limit)
+    if err == nil && len(result) != 0 {
+        response.WriteEntity(result)
+    } else {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusNotFound, "Nothing was found")
+    }
+}
+
+func (service RestService) listAuthorsBooks(request *restful.Request, response *restful.Response) {
+    authorId, _ := strconv.ParseUint(request.PathParameter("authorId"), 0, 32)
+    result, err := service.dataStore.ListAuthorBooks(uint(authorId))
+    if err == nil {
+        response.WriteEntity(result)
+    } else {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusNotFound, "No books was found")
+    }
+}
+
 func (service RestService) StartListen() {
     log.Println("Start listening on ", service.listen)
     server := &http.Server{Addr: service.listen, Handler: service.container}
@@ -109,6 +156,7 @@ func NewRestService(listen string, dataStore datastore.DataStorer) *RestService 
     service.container.Router(restful.CurlyRouter{})
 
     service.registerBookResource(service.container)
+    service.registerAuthorResource(service.container)
 
     return service
 }
