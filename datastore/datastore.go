@@ -94,6 +94,17 @@ func (store *dbStore) FindAuthors(author string, limit int) ([]models.Author, er
     return result, nil
 }
 
+func (store *dbStore) GetAuthor(authorId uint) (*models.Author, error) {
+    result := new(models.Author)
+    store.db.First(result, authorId)
+    if result.ID > 0 {
+        result.Name = utils.UpperInitialAll(result.Name)
+        return result, nil
+    } else {
+        return nil, fmt.Errorf("No author found")
+    }
+}
+
 func (store *dbStore) ListAuthorBooks(authorId uint) ([]models.Book, error) {
     result := []models.Book{}
     search := store.db.Select("books.*").Table("books").

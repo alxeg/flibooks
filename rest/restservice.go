@@ -56,6 +56,13 @@ func (service RestService) registerAuthorResource(container *restful.Container) 
         Consumes(restful.MIME_JSON).
         Produces(restful.MIME_JSON)
 
+    ws.Route(ws.GET("/{authorId}").
+        To(service.getAuthor).
+        Doc("Get author's info").
+        Operation("getAuthor").
+        Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
+        Returns(200, "OK", models.Author{}))
+
     ws.Route(ws.GET("/{authorId}/books").
         To(service.listAuthorsBooks).
         Doc("Show author's books").
@@ -74,7 +81,7 @@ func (service RestService) registerAuthorResource(container *restful.Container) 
 
 func (service RestService) getBook(request *restful.Request, response *restful.Response) {
     bookId, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
-    log.Println("Requesting ", bookId)
+    log.Println("Requesting book ", bookId)
     result, err := service.dataStore.GetBook(uint(bookId))
     if err == nil {
         response.WriteEntity(result)
@@ -86,6 +93,7 @@ func (service RestService) getBook(request *restful.Request, response *restful.R
 
 func (service RestService) downloadBook(request *restful.Request, response *restful.Response) {
     bookId, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
+    log.Println("Downloading book ", bookId)
     result, err := service.dataStore.GetBook(uint(bookId))
     if err == nil {
         authors := ""
@@ -108,6 +116,7 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 func (service RestService) searchBooks(request *restful.Request, response *restful.Response) {
     search := models.Search{}
     request.ReadEntity(&search)
+    log.Println("Searching books ", search)
 
     result, err := service.dataStore.FindBooks(search.Title, search.Author, search.Limit)
     if err == nil && len(result) != 0 {
@@ -121,6 +130,7 @@ func (service RestService) searchBooks(request *restful.Request, response *restf
 func (service RestService) searchAuthors(request *restful.Request, response *restful.Response) {
     search := models.Search{}
     request.ReadEntity(&search)
+    log.Println("Searching authors ", search)
 
     result, err := service.dataStore.FindAuthors(search.Author, search.Limit)
     if err == nil && len(result) != 0 {
@@ -131,8 +141,23 @@ func (service RestService) searchAuthors(request *restful.Request, response *res
     }
 }
 
+func (service RestService) getAuthor(request *restful.Request, response *restful.Response) {
+    authorId, _ := strconv.ParseUint(request.PathParameter("authorId"), 0, 32)
+    log.Println("Requesting author ", authorId)
+
+    result, err := service.dataStore.GetAuthor(uint(authorId))
+    if err == nil {
+        response.WriteEntity(result)
+    } else {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusNotFound, "No author was found")
+    }
+}
+
 func (service RestService) listAuthorsBooks(request *restful.Request, response *restful.Response) {
     authorId, _ := strconv.ParseUint(request.PathParameter("authorId"), 0, 32)
+    log.Println("Requesting author's books ", authorId)
+
     result, err := service.dataStore.ListAuthorBooks(uint(authorId))
     if err == nil {
         response.WriteEntity(result)
