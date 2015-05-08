@@ -116,6 +116,7 @@ func processBook(line string) (book *models.Book, err error) {
     }
     book.Title = strings.ToLower(elements[2])
     book.Series = elements[3]
+    book.SerNo = elements[4]
     book.File = elements[5]
     book.FileSize = elements[6]
     book.LibId = elements[7]
