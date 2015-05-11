@@ -61,7 +61,7 @@ func (store *dbStore) fillBooksDetails(books []models.Book) []models.Book {
 func (store *dbStore) FindBooks(title string, authors string, limit int) ([]models.Book, error) {
 
     result := []models.Book{}
-    search := store.db.Select("books.*").Table("books").
+    search := store.db.Select("distinct books.*").Table("books").
         Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
     for _, term := range utils.SplitBySeparators(strings.ToLower(title)) {
         search = search.Where("title LIKE ?", "%"+term+"%")
