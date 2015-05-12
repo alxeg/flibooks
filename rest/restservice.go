@@ -156,9 +156,11 @@ func (service RestService) getAuthor(request *restful.Request, response *restful
 
 func (service RestService) listAuthorsBooks(request *restful.Request, response *restful.Response) {
     authorId, _ := strconv.ParseUint(request.PathParameter("authorId"), 0, 32)
+    noDetails, _ := utils.ParseBool(request.QueryParameter("no-details"))
+
     log.Println("Requesting author's books ", authorId)
 
-    result, err := service.dataStore.ListAuthorBooks(uint(authorId))
+    result, err := service.dataStore.ListAuthorBooks(uint(authorId), noDetails)
     if err == nil {
         response.WriteEntity(result)
     } else {

@@ -77,7 +77,7 @@ func main() {
             log.Println("Noone found")
         }
     } else if listAuthor > 0 {
-        result, err := store.ListAuthorBooks(listAuthor)
+        result, err := store.ListAuthorBooks(listAuthor, false)
         if err == nil && len(result) != 0 {
             printJson(result)
         } else {

@@ -64,10 +64,10 @@ func (store *dbStore) FindBooks(title string, authors string, limit int) ([]mode
     search := store.db.Select("distinct books.*").Table("books").
         Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
     for _, term := range utils.SplitBySeparators(strings.ToLower(title)) {
-        search = search.Where("title LIKE ?", "%"+term+"%")
+        search = search.Where("title LIKE ? and books.del=0", "%"+term+"%")
     }
     for _, term := range utils.SplitBySeparators(strings.ToLower(authors)) {
-        search = search.Where("name LIKE ?", "%"+term+"%")
+        search = search.Where("name LIKE ? and books.del=0", "%"+term+"%")
     }
     if limit > 0 {
         search = search.Limit(limit)
@@ -105,12 +105,14 @@ func (store *dbStore) GetAuthor(authorId uint) (*models.Author, error) {
     }
 }
 
-func (store *dbStore) ListAuthorBooks(authorId uint) ([]models.Book, error) {
+func (store *dbStore) ListAuthorBooks(authorId uint, noDetails bool) ([]models.Book, error) {
     result := []models.Book{}
     search := store.db.Select("books.*").Table("books").
         Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
-    search.Where("authors.ID=?", authorId).Preload("Container").Order("title").Find(&result)
-    result = store.fillBooksDetails(result)
+    search.Where("authors.ID=? and books.del=0", authorId).Preload("Container").Order("title").Find(&result)
+    if !noDetails {
+        result = store.fillBooksDetails(result)
+    }
     return result, nil
 }
 
