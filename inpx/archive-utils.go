@@ -2,6 +2,7 @@ package inpx
 
 import (
     "archive/zip"
+    "fmt"
     "github.com/alxeg/flibooks/models"
     "io"
     "log"
@@ -15,7 +16,8 @@ func UnzipBookToWriter(book *models.Book, writer io.Writer) (err error) {
 
     r, err := zip.OpenReader(container)
     if err != nil {
-        log.Fatalln("Failed to open container", container)
+        log.Printf("Failed to open container %s\n", container)
+        return fmt.Errorf("Failed to open container %s", container)
     }
     defer r.Close()
     for _, file := range r.File {
@@ -53,7 +55,7 @@ func UnzipBookFile(book *models.Book, targetFolder string, rename bool) (err err
     }
     defer f.Close()
 
-    UnzipBookToWriter(book, f)
+    err = UnzipBookToWriter(book, f)
 
     return err
 

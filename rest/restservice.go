@@ -106,7 +106,11 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
         response.AddHeader("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
             utils.ReplaceUnsupported(outName)), "+", "%20", -1))
 
-        inpx.UnzipBookToWriter(result, response)
+        err := inpx.UnzipBookToWriter(result, response)
+        if err != nil {
+            response.AddHeader("Content-Type", "text/plain")
+            response.WriteErrorString(http.StatusNotFound, "Book wasn't found")
+        }
     } else {
         response.AddHeader("Content-Type", "text/plain")
         response.WriteErrorString(http.StatusNotFound, "Book wasn't found")
