@@ -6,7 +6,7 @@ import (
     "github.com/alxeg/flibooks/utils"
     "github.com/jinzhu/gorm"
     _ "github.com/mattn/go-sqlite3"
-    "os"
+    _ "os"
     "strings"
 )
 
@@ -127,6 +127,12 @@ func (store *dbStore) GetBook(bookId uint) (*models.Book, error) {
     }
 }
 
+func (store *dbStore) IsContainerExist(fileName string) bool {
+    contObj := new(models.Container)
+    store.db.Where("file_name = ?", fileName).First(&contObj)
+    return contObj.ID > 0
+}
+
 func (store *dbStore) Close() {
     if store.reset {
     }
@@ -134,9 +140,9 @@ func (store *dbStore) Close() {
 
 func NewDBStore(dbPath string, reset bool) (DataStorer, error) {
     dataPath := dbPath + "/fli-data.db"
-    if reset {
-        os.Remove(dataPath)
-    }
+    // if reset {
+    //     os.Remove(dataPath)
+    // }
     db, err := gorm.Open("sqlite3", dataPath)
     if err == nil {
         db.DB()

@@ -38,7 +38,7 @@ func ReadInpxFile(dataFile string, store datastore.DataStorer) (err error) {
 
     log.Println("Paralleling in ", numProcesses)
     for i := 0; i < numProcesses; i++ {
-        go processInp(files, results, done)
+        go processInp(files, results, done, store)
     }
 
     waitAndProcessResults(done, results, store)
@@ -48,7 +48,7 @@ func ReadInpxFile(dataFile string, store datastore.DataStorer) (err error) {
     return nil
 }
 
-func processInp(files <-chan *zip.File, results chan<- *models.Book, done chan<- struct{}) {
+func processInp(files <-chan *zip.File, results chan<- *models.Book, done chan<- struct{}, store datastore.DataStorer) {
 
     defer func() {
         done <- struct{}{}
@@ -57,6 +57,13 @@ func processInp(files <-chan *zip.File, results chan<- *models.Book, done chan<-
     for file := range files {
 
         if !strings.HasSuffix(file.FileInfo().Name(), ".inp") {
+            continue
+        }
+
+        zipContainer := strings.Replace(file.FileInfo().Name(), ".inp", ".zip", -1)
+
+        if store.IsContainerExist(zipContainer) {
+            log.Printf("Container %s already exists in the db, skipping...", file.FileInfo().Name())
             continue
         }
 
