@@ -4,6 +4,7 @@ import (
     "fmt"
     "github.com/alxeg/flibooks/models"
     "github.com/alxeg/flibooks/utils"
+    _ "github.com/go-sql-driver/mysql"
     "github.com/jinzhu/gorm"
     _ "github.com/mattn/go-sqlite3"
     _ "os"
@@ -11,8 +12,7 @@ import (
 )
 
 type dbStore struct {
-    db    gorm.DB
-    reset bool
+    db gorm.DB
 }
 
 func (store *dbStore) PutBook(book *models.Book) (err error) {
@@ -134,16 +134,10 @@ func (store *dbStore) IsContainerExist(fileName string) bool {
 }
 
 func (store *dbStore) Close() {
-    if store.reset {
-    }
 }
 
-func NewDBStore(dbPath string, reset bool) (DataStorer, error) {
-    dataPath := dbPath + "/fli-data.db"
-    // if reset {
-    //     os.Remove(dataPath)
-    // }
-    db, err := gorm.Open("sqlite3", dataPath)
+func NewDBStore(config *models.DBConfig) (DataStorer, error) {
+    db, err := gorm.Open(config.DBType, config.DBParams)
     if err == nil {
         db.DB()
         db.AutoMigrate(&models.Author{}, &models.Container{}, &models.Genre{}, &models.Book{})
@@ -151,7 +145,6 @@ func NewDBStore(dbPath string, reset bool) (DataStorer, error) {
     }
     result := new(dbStore)
     result.db = db
-    result.reset = reset
 
     return result, err
 }

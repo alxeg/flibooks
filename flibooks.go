@@ -5,8 +5,10 @@ import (
     "fmt"
     "github.com/alxeg/flibooks/datastore"
     "github.com/alxeg/flibooks/inpx"
+    "github.com/alxeg/flibooks/models"
     "github.com/alxeg/flibooks/rest"
     flag "github.com/ogier/pflag"
+    "io/ioutil"
     "log"
     "os"
     "path/filepath"
@@ -22,6 +24,7 @@ var (
     getBook      uint
     save         bool
     listen       string
+    dbConfig     string
 )
 
 func init() {
@@ -34,6 +37,7 @@ func init() {
     flag.UintVar(&getBook, "get-book", 0, "Get book by its id")
     flag.BoolVar(&save, "save", false, "Save book file to the disk")
     flag.StringVar(&listen, "listen", ":8000", "Set server listen address:port")
+    flag.StringVar(&dbConfig, "db-config", "", "Set database config file, use sqlite db in data-dir if omited")
 
 }
 
@@ -47,6 +51,21 @@ func printJson(object interface{}) {
 
 }
 
+func readConfig(filePath string) *models.DBConfig {
+    result := new(models.DBConfig)
+
+    fileData, err := ioutil.ReadFile(filePath)
+    if err == nil {
+        err = json.Unmarshal(fileData, result)
+    }
+
+    if err != nil { // fallback to sqlite
+        result.DBType = "sqlite3"
+        result.DBParams = dataDir + "/fli-data.db"
+    }
+    return result
+}
+
 func main() {
     flag.Parse()
 
@@ -54,7 +73,7 @@ func main() {
         dataDir, _ = filepath.Abs(filepath.Dir(os.Args[0]))
     }
 
-    store, err := datastore.NewDBStore(dataDir, fileToParse != "")
+    store, err := datastore.NewDBStore(readConfig(dbConfig))
     if err != nil {
         log.Fatalln("Failed to open database")
     }
