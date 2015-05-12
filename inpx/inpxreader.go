@@ -14,7 +14,7 @@ import (
 
 var (
     versionFile  = "version.info"
-    numProcesses = runtime.NumCPU()
+    numProcesses = runtime.NumCPU() * 2
 )
 
 func ReadInpxFile(dataFile string, store datastore.DataStorer) (err error) {

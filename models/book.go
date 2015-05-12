@@ -10,7 +10,7 @@ type Book struct {
     ContainerID uint      `json:"-"`
     Authors     []Author  `json:"authors" gorm:"many2many:book_authors;"`
     Genres      []Genre   `json:"genres"  gorm:"many2many:book_genres;"`
-    Title       string    `json:"title"`
+    Title       string    `json:"title" sql:"index"`
     Series      string    `json:"series,omitempty"`
     SerNo       string    `json:"ser_no,omitempty"`
     File        string    `json:"file"`
