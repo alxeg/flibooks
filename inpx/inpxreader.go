@@ -27,7 +27,7 @@ func ReadInpxFile(dataFile string, store datastore.DataStorer) (err error) {
 
     files := make(chan *zip.File, 10)
     done := make(chan struct{})
-    results := make(chan *models.Book, 10)
+    results := make(chan *models.Book, 100)
 
     go func() {
         for _, file := range r.File {
@@ -62,9 +62,10 @@ func processInp(files <-chan *zip.File, results chan<- *models.Book, done chan<-
 
         zipContainer := strings.Replace(file.FileInfo().Name(), ".inp", ".zip", -1)
 
+        update := false
         if store.IsContainerExist(zipContainer) {
-            log.Printf("Container %s already exists in the db, skipping...", file.FileInfo().Name())
-            continue
+            log.Printf("Container %s already exists in the db. Data will be updated...", file.FileInfo().Name())
+            update = true
         }
 
         log.Println("Processing file ", file.FileInfo().Name())
@@ -74,9 +75,10 @@ func processInp(files <-chan *zip.File, results chan<- *models.Book, done chan<-
             for {
                 line, err := reader.ReadString('\n')
                 if line != "" {
-                    book, bookErr := processBook(line)
+                    book, bookErr := processBook(line, update)
                     if bookErr == nil {
                         book.Container = models.Container{FileName: strings.Replace(file.FileInfo().Name(), ".inp", ".zip", -1)}
+                        book.Update = update
                         results <- book
                     } else {
                         log.Println(bookErr)
@@ -108,18 +110,20 @@ func trimSlice(in []string) []string {
     return in
 }
 
-func processBook(line string) (book *models.Book, err error) {
+func processBook(line string, update bool) (book *models.Book, err error) {
     elements := strings.Split(line, string([]byte{0x04}))
     if len(elements) < 12 {
         return book, fmt.Errorf("Illegal number of elements")
     }
 
     book = new(models.Book)
-    for _, author := range trimSlice(strings.Split(elements[0], ":")) {
-        book.Authors = append(book.Authors, models.Author{Name: strings.ToLower(author)})
-    }
-    for _, genre := range trimSlice(strings.Split(elements[1], ":")) {
-        book.Genres = append(book.Genres, models.Genre{GenreCode: genre})
+    if !update {
+        for _, author := range trimSlice(strings.Split(elements[0], ":")) {
+            book.Authors = append(book.Authors, models.Author{Name: strings.ToLower(author)})
+        }
+        for _, genre := range trimSlice(strings.Split(elements[1], ":")) {
+            book.Genres = append(book.Genres, models.Genre{GenreCode: genre})
+        }
     }
     book.Title = strings.ToLower(elements[2])
     book.Series = elements[3]
@@ -138,7 +142,11 @@ func waitAndProcessResults(done <-chan struct{}, results <-chan *models.Book, st
     for working := numProcesses; working > 0; {
         select {
         case book := <-results:
-            store.PutBook(book)
+            if book.Update {
+                store.UpdateBook(book)
+            } else {
+                store.PutBook(book)
+            }
         case <-done:
             log.Println("Gorutine finished work")
             working--
@@ -148,7 +156,11 @@ func waitAndProcessResults(done <-chan struct{}, results <-chan *models.Book, st
     for {
         select { // Nonblocking
         case book := <-results:
-            store.PutBook(book)
+            if book.Update {
+                store.UpdateBook(book)
+            } else {
+                store.PutBook(book)
+            }
         default:
             return
         }

@@ -23,6 +23,7 @@ type Book struct {
     Extra1      string    `json:"extra_1,omitempty"`
     Extra2      string    `json:"extra_2,omitempty"`
     Extra3      string    `json:"extra_3,omitempty"`
+    Update      bool      `json:"-" sql:"-"`
 }
 
 func (book *Book) AfterFind() {
