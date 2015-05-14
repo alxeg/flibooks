@@ -61,16 +61,17 @@ func readConfig(filePath string) *models.DBConfig {
 
     if err != nil { // fallback to sqlite
         result.DBType = "sqlite3"
-        result.DBParams = dataDir + "/fli-data.db"
+        result.DBParams = filepath.Join(dataDir, "fli-data.db")
     }
     return result
 }
 
 func main() {
     flag.Parse()
+    curDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 
     if dataDir == "" {
-        dataDir, _ = filepath.Abs(filepath.Dir(os.Args[0]))
+        dataDir = curDir
     }
 
     store, err := datastore.NewDBStore(readConfig(dbConfig))
@@ -107,7 +108,7 @@ func main() {
         if err == nil {
             printJson(result)
             if save {
-                err = inpx.UnzipBookFile(result, dataDir, true)
+                err = inpx.UnzipBookFile(dataDir, result, curDir, true)
                 if err != nil {
                     log.Fatalln("Failed to save file", err)
                 }
@@ -119,6 +120,6 @@ func main() {
     } else {
         fmt.Println("Additional parameters are:")
         flag.PrintDefaults()
-        rest.NewRestService(listen, store).StartListen()
+        rest.NewRestService(listen, store, dataDir).StartListen()
     }
 }

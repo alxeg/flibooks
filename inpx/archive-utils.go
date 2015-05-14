@@ -10,11 +10,11 @@ import (
     "path/filepath"
 )
 
-func UnzipBookToWriter(book *models.Book, writer io.Writer) (err error) {
+func UnzipBookToWriter(dataDir string, book *models.Book, writer io.Writer) (err error) {
     container := book.Container.FileName
     fileName := book.File + "." + book.Ext
 
-    r, err := zip.OpenReader(container)
+    r, err := zip.OpenReader(filepath.Join(dataDir, container))
     if err != nil {
         log.Printf("Failed to open container %s\n", container)
         return fmt.Errorf("Failed to open container %s", container)
@@ -36,7 +36,7 @@ func UnzipBookToWriter(book *models.Book, writer io.Writer) (err error) {
     return err
 }
 
-func UnzipBookFile(book *models.Book, targetFolder string, rename bool) (err error) {
+func UnzipBookFile(dataDir string, book *models.Book, targetFolder string, rename bool) (err error) {
     var outName string
     if rename {
         authors := ""
@@ -55,7 +55,7 @@ func UnzipBookFile(book *models.Book, targetFolder string, rename bool) (err err
     }
     defer f.Close()
 
-    err = UnzipBookToWriter(book, f)
+    err = UnzipBookToWriter(dataDir, book, f)
 
     return err
 

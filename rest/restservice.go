@@ -15,6 +15,7 @@ import (
 
 type RestService struct {
     listen    string
+    dataDir   string
     dataStore datastore.DataStorer
     container *restful.Container
 }
@@ -106,7 +107,7 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
         response.AddHeader("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
             utils.ReplaceUnsupported(outName)), "+", "%20", -1))
 
-        err := inpx.UnzipBookToWriter(result, response)
+        err := inpx.UnzipBookToWriter(service.dataDir, result, response)
         if err != nil {
             response.AddHeader("Content-Type", "text/plain")
             response.WriteErrorString(http.StatusNotFound, "Book wasn't found")
@@ -179,10 +180,11 @@ func (service RestService) StartListen() {
     log.Fatal(server.ListenAndServe())
 }
 
-func NewRestService(listen string, dataStore datastore.DataStorer) *RestService {
+func NewRestService(listen string, dataStore datastore.DataStorer, dataDir string) *RestService {
     service := new(RestService)
     service.listen = listen
     service.dataStore = dataStore
+    service.dataDir = dataDir
     service.container = restful.NewContainer()
     service.container.Router(restful.CurlyRouter{})
 
