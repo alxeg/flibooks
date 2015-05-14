@@ -111,7 +111,7 @@ func (store *dbStore) ListAuthorBooks(authorId uint, noDetails bool) ([]models.B
     result := []models.Book{}
     search := store.db.Select("distinct books.*").Table("books").
         Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
-    search.Where("authors.ID=?", authorId).Preload("Container").Order("title").Find(&result)
+    search.Where("authors.ID=?", authorId).Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
     if !noDetails {
         result = store.fillBooksDetails(result, false)
     }
