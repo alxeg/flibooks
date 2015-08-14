@@ -167,7 +167,7 @@ func NewDBStore(config *models.DBConfig) (DataStorer, error) {
     if err == nil {
         db.DB()
         db.AutoMigrate(&models.Author{}, &models.Container{}, &models.Genre{}, &models.Book{})
-        db.LogMode(true)
+        // db.LogMode(true)
     }
     result := new(dbStore)
     result.db = db
