@@ -8,6 +8,7 @@ type DataStorer interface {
     PutBook(*models.Book) error
     UpdateBook(*models.Book) (*models.Book, error)
     FindBooks(title string, authors string, limit int) ([]models.Book, error)
+    FindBooksByLibId(libId string) ([]models.Book, error)
     FindAuthors(author string, limit int) ([]models.Author, error)
     GetAuthor(authorId uint) (*models.Author, error)
     ListAuthorBooks(authorId uint, noDetails bool) ([]models.Book, error)

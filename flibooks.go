@@ -19,6 +19,7 @@ var (
     dataDir      string
     searchTitle  string
     searchAuthor string
+    searchLibId  string
     listAuthor   uint
     limit        int
     getBook      uint
@@ -32,6 +33,7 @@ func init() {
     flag.StringVar(&dataDir, "data-dir", "", "Folder to put database files")
     flag.StringVar(&searchTitle, "search-title", "", "Search books by their title")
     flag.StringVar(&searchAuthor, "search-author", "", "Search authors, or books by author if comes with search-title")
+    flag.StringVar(&searchLibId, "search-lib-id", "", "Search book(s) by its libId")
     flag.IntVar(&limit, "limit", 10, "Limit search results (-1 for no limit)")
     flag.UintVar(&listAuthor, "list-author", 0, "List all author's books by id")
     flag.UintVar(&getBook, "get-book", 0, "Get book by its id")
@@ -82,6 +84,13 @@ func main() {
     if fileToParse != "" {
         log.Printf("Opening %s to parse data\n", fileToParse)
         inpx.ReadInpxFile(fileToParse, store)
+    } else if searchLibId != "" {
+        result, err := store.FindBooksByLibId(searchLibId)
+        if err == nil && len(result) != 0 {
+            printJson(result)
+        } else {
+            log.Println("Nothing found")
+        }
     } else if searchTitle != "" {
         result, err := store.FindBooks(searchTitle, searchAuthor, limit)
         if err == nil && len(result) != 0 {

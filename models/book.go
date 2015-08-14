@@ -15,7 +15,7 @@ type Book struct {
     SerNo       string    `json:"ser_no,omitempty"`
     File        string    `json:"file"`
     FileSize    string    `json:"file_size"`
-    LibId       string    `json:"lib_id"`
+    LibId       string    `json:"lib_id" sql:"index"`
     Del         string    `json:"del"`
     Ext         string    `json:"ext"`
     Date        string    `json:"date"`

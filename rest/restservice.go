@@ -47,6 +47,13 @@ func (service RestService) registerBookResource(container *restful.Container) {
         Operation("searchBooks").
         Returns(200, "OK", []models.Book{}))
 
+    ws.Route(ws.GET("/lib/{libId}").
+        To(service.getBooksByLibId).
+        Doc("Get books by libId").
+        Operation("getBooksByLibId").
+        Param(ws.PathParameter("libId", "libId of the book").DataType("string")).
+        Returns(200, "OK", []models.Book{}))
+
     container.Add(ws)
 }
 
@@ -89,6 +96,18 @@ func (service RestService) getBook(request *restful.Request, response *restful.R
     } else {
         response.AddHeader("Content-Type", "text/plain")
         response.WriteErrorString(http.StatusNotFound, "Book wasn't found")
+    }
+}
+
+func (service RestService) getBooksByLibId(request *restful.Request, response *restful.Response) {
+    libId := request.PathParameter("libId")
+    log.Println("Get books by libId ", libId)
+    result, err := service.dataStore.FindBooksByLibId(libId)
+    if err == nil && len(result) != 0 {
+        response.WriteEntity(result)
+    } else {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusNotFound, "Nothing was found")
     }
 }
 
