@@ -30,6 +30,10 @@
 			"ImportPath": "github.com/ogier/pflag",
 			"Comment": "v0.0.1-4-g6f7159c",
 			"Rev": "6f7159c3154e7cd4ab30f6cc9c58fa3fd0f22325"
+		},
+		{
+			"ImportPath": "github.com/qor/inflection",
+			"Rev": "45321e63b98c756df17369c027c1df89298e1288"
 		}
 	]
 }

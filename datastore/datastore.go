@@ -80,6 +80,15 @@ func (store *dbStore) FindBooks(title string, authors string, limit int) ([]mode
     return result, nil
 }
 
+func (store *dbStore) FindBooksByLibId(libId string) ([]models.Book, error) {
+    result := []models.Book{}
+    store.db.Select("distinct books.*").Table("books").
+        Where("lib_id = ?", libId).
+        Find(&result)
+    result = store.fillBooksDetails(result, true)
+    return result, nil
+}
+
 func (store *dbStore) FindAuthors(author string, limit int) ([]models.Author, error) {
     result := []models.Author{}
     search := store.db.Order("name")
