@@ -4,31 +4,32 @@
 	"Deps": [
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.1.3-42-g03f8ad5",
-			"Rev": "03f8ad5589baf3c67a448fd9354da27419db712d"
+			"Comment": "v1.1.3-80-g2cb1810",
+			"Rev": "2cb18102b6ecdca51fcfd9d39bc8738de278c1ea"
 		},
 		{
 			"ImportPath": "github.com/go-sql-driver/mysql",
-			"Comment": "v1.2-97-g0cc29e9",
-			"Rev": "0cc29e9fe8e25c2c58cf47bcab566e029bbaa88b"
+			"Comment": "v1.2-118-g3dd7008",
+			"Rev": "3dd7008ac1529aca1bcd8a9db75228a71ba23cac"
 		},
 		{
 			"ImportPath": "github.com/jinzhu/gorm",
-			"Rev": "3c2915a9dfaaeaeb1e049436ae9291f5e84c95fa"
+			"Rev": "dd0d4d931f0d6b52e3c8df75496b0a1aaa5667e6"
 		},
 		{
 			"ImportPath": "github.com/lib/pq/hstore",
-			"Comment": "go1.0-cutoff-40-g8910d1c",
-			"Rev": "8910d1c3a4bda5c97c50bc38543953f1f1e1f8bb"
+			"Comment": "go1.0-cutoff-59-gb269bd0",
+			"Rev": "b269bd035a727d6c1081f76e7a239a1b00674c40"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-sqlite3",
-			"Rev": "542ae647f8601bafd96233961b150cae198e0295"
+			"Comment": "v1.0.0-2-g0fa27b5",
+			"Rev": "0fa27b5cb05c4239ff23cbec3af1d56af75c1854"
 		},
 		{
 			"ImportPath": "github.com/ogier/pflag",
-			"Comment": "v0.0.1-2-g2e6f5f3",
-			"Rev": "2e6f5f3f0c40ab9cb459742296f6a2aaab1fd5dc"
+			"Comment": "v0.0.1-4-g6f7159c",
+			"Rev": "6f7159c3154e7cd4ab30f6cc9c58fa3fd0f22325"
 		}
 	]
 }
