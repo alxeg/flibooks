@@ -92,7 +92,7 @@ func main() {
             log.Println("Nothing found")
         }
     } else if searchTitle != "" {
-        result, err := store.FindBooks(searchTitle, searchAuthor, limit)
+        result, err := store.FindBooks(models.Search{Title: searchTitle, Author: searchAuthor, Limit: limit})
         if err == nil && len(result) != 0 {
             printJson(result)
         } else {
@@ -103,10 +103,10 @@ func main() {
         if err == nil && len(result) != 0 {
             printJson(result)
         } else {
-            log.Println("Noone found")
+            log.Println("Nothing found")
         }
     } else if listAuthor > 0 {
-        result, err := store.ListAuthorBooks(listAuthor, false)
+        result, err := store.ListAuthorBooks(listAuthor, false, models.Search{})
         if err == nil && len(result) != 0 {
             printJson(result)
         } else {

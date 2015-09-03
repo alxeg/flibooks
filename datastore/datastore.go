@@ -60,7 +60,10 @@ func (store *dbStore) fillBooksDetails(books []models.Book, fillGenres bool) []m
     return books
 }
 
-func (store *dbStore) FindBooks(title string, authors string, limit int) ([]models.Book, error) {
+func (store *dbStore) FindBooks(params models.Search) ([]models.Book, error) {
+    title := params.Title
+    authors := params.Author
+    limit := params.Limit
 
     result := []models.Book{}
     search := store.db.Select("distinct books.*").Table("books").
@@ -71,6 +74,14 @@ func (store *dbStore) FindBooks(title string, authors string, limit int) ([]mode
     for _, term := range utils.SplitBySeparators(strings.ToLower(authors)) {
         search = search.Where("name LIKE ?", "%"+term+"%")
     }
+    if !params.Deleted {
+        search.Where("del = 0")
+    }
+
+    if len(params.Langs) > 0 {
+        search.Where("lang in (" + strings.Join(params.Langs, ",") + ")")
+    }
+
     if limit > 0 {
         search = search.Limit(limit)
     }
@@ -116,11 +127,19 @@ func (store *dbStore) GetAuthor(authorId uint) (*models.Author, error) {
     }
 }
 
-func (store *dbStore) ListAuthorBooks(authorId uint, noDetails bool) ([]models.Book, error) {
+func (store *dbStore) ListAuthorBooks(authorId uint, noDetails bool, params models.Search) ([]models.Book, error) {
     result := []models.Book{}
     search := store.db.Select("distinct books.*").Table("books").
         Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
-    search.Where("authors.ID=?", authorId).Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
+    search.Where("authors.ID=?", authorId)
+    if !params.Deleted {
+        search.Where("del = 0")
+    }
+    if len(params.Langs) > 0 {
+        search.Where("lang in (" + strings.Join(params.Langs, ",") + ")")
+    }
+
+    search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
     if !noDetails {
         result = store.fillBooksDetails(result, false)
     }

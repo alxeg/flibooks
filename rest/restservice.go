@@ -78,6 +78,13 @@ func (service RestService) registerAuthorResource(container *restful.Container) 
         Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
         Returns(200, "OK", []models.Book{}))
 
+    ws.Route(ws.POST("/{authorId}/books").
+        To(service.listAuthorsBooksPost).
+        Doc("Show author's books").
+        Operation("listAuthorsBooks").
+        Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
+        Returns(200, "OK", []models.Book{}))
+
     ws.Route(ws.POST("/search").
         To(service.searchAuthors).
         Doc("Search authors").
@@ -142,7 +149,7 @@ func (service RestService) searchBooks(request *restful.Request, response *restf
     request.ReadEntity(&search)
     log.Println("Searching books ", search)
 
-    result, err := service.dataStore.FindBooks(search.Title, search.Author, search.Limit)
+    result, err := service.dataStore.FindBooks(search)
     if err == nil && len(result) != 0 {
         response.WriteEntity(result)
     } else {
@@ -184,7 +191,24 @@ func (service RestService) listAuthorsBooks(request *restful.Request, response *
 
     log.Println("Requesting author's books ", authorId)
 
-    result, err := service.dataStore.ListAuthorBooks(uint(authorId), noDetails)
+    result, err := service.dataStore.ListAuthorBooks(uint(authorId), noDetails, models.Search{})
+    if err == nil {
+        response.WriteEntity(result)
+    } else {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusNotFound, "No books was found")
+    }
+}
+
+func (service RestService) listAuthorsBooksPost(request *restful.Request, response *restful.Response) {
+    authorId, _ := strconv.ParseUint(request.PathParameter("authorId"), 0, 32)
+    noDetails, _ := utils.ParseBool(request.QueryParameter("no-details"))
+    search := models.Search{}
+    request.ReadEntity(&search)
+
+    log.Println("Requesting author's books ", authorId)
+
+    result, err := service.dataStore.ListAuthorBooks(uint(authorId), noDetails, search)
     if err == nil {
         response.WriteEntity(result)
     } else {
