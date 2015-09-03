@@ -7,6 +7,7 @@ import (
     "github.com/alxeg/flibooks/inpx"
     "github.com/alxeg/flibooks/models"
     "github.com/alxeg/flibooks/rest"
+    "github.com/alxeg/flibooks/utils"
     flag "github.com/ogier/pflag"
     "io/ioutil"
     "log"
@@ -40,16 +41,6 @@ func init() {
     flag.BoolVar(&save, "save", false, "Save book file to the disk")
     flag.StringVar(&listen, "listen", ":8000", "Set server listen address:port")
     flag.StringVar(&dbConfig, "db-config", "", "Set database config file, use sqlite db in data-dir if omited")
-
-}
-
-func printJson(object interface{}) {
-    jsonBytes, err := json.MarshalIndent(object, "", "  ")
-    if err == nil {
-        fmt.Println(string(jsonBytes))
-    } else {
-        log.Fatalln("Invalid object")
-    }
 
 }
 
@@ -87,35 +78,35 @@ func main() {
     } else if searchLibId != "" {
         result, err := store.FindBooksByLibId(searchLibId)
         if err == nil && len(result) != 0 {
-            printJson(result)
+            utils.PrintJson(result)
         } else {
             log.Println("Nothing found")
         }
     } else if searchTitle != "" {
         result, err := store.FindBooks(models.Search{Title: searchTitle, Author: searchAuthor, Limit: limit})
         if err == nil && len(result) != 0 {
-            printJson(result)
+            utils.PrintJson(result)
         } else {
             log.Println("Nothing found")
         }
     } else if searchAuthor != "" {
         result, err := store.FindAuthors(searchAuthor, limit)
         if err == nil && len(result) != 0 {
-            printJson(result)
+            utils.PrintJson(result)
         } else {
             log.Println("Nothing found")
         }
     } else if listAuthor > 0 {
         result, err := store.ListAuthorBooks(listAuthor, false, models.Search{})
         if err == nil && len(result) != 0 {
-            printJson(result)
+            utils.PrintJson(result)
         } else {
             log.Println("Nothing found")
         }
     } else if getBook > 0 {
         result, err := store.GetBook(getBook)
         if err == nil {
-            printJson(result)
+            utils.PrintJson(result)
             if save {
                 err = inpx.UnzipBookFile(dataDir, result, curDir, true)
                 if err != nil {

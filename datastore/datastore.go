@@ -15,6 +15,20 @@ type dbStore struct {
     db gorm.DB
 }
 
+func addParams(search *gorm.DB, params models.Search) *gorm.DB {
+    if !params.Deleted {
+        search = search.Where("del = 0")
+    }
+
+    if len(params.Langs) > 0 {
+        for i, _ := range params.Langs {
+            params.Langs[i] = "'" + params.Langs[i] + "'"
+        }
+        search = search.Where("lang in (" + strings.Join(params.Langs, ",") + ")")
+    }
+    return search
+}
+
 func (store *dbStore) PutBook(book *models.Book) (err error) {
     tx := store.db.Begin()
 
@@ -65,6 +79,8 @@ func (store *dbStore) FindBooks(params models.Search) ([]models.Book, error) {
     authors := params.Author
     limit := params.Limit
 
+    // utils.PrintJson(params)
+
     result := []models.Book{}
     search := store.db.Select("distinct books.*").Table("books").
         Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
@@ -74,13 +90,8 @@ func (store *dbStore) FindBooks(params models.Search) ([]models.Book, error) {
     for _, term := range utils.SplitBySeparators(strings.ToLower(authors)) {
         search = search.Where("name LIKE ?", "%"+term+"%")
     }
-    if !params.Deleted {
-        search.Where("del = 0")
-    }
 
-    if len(params.Langs) > 0 {
-        search.Where("lang in (" + strings.Join(params.Langs, ",") + ")")
-    }
+    search = addParams(search, params)
 
     if limit > 0 {
         search = search.Limit(limit)
@@ -131,13 +142,9 @@ func (store *dbStore) ListAuthorBooks(authorId uint, noDetails bool, params mode
     result := []models.Book{}
     search := store.db.Select("distinct books.*").Table("books").
         Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
-    search.Where("authors.ID=?", authorId)
-    if !params.Deleted {
-        search.Where("del = 0")
-    }
-    if len(params.Langs) > 0 {
-        search.Where("lang in (" + strings.Join(params.Langs, ",") + ")")
-    }
+    search = search.Where("authors.ID=?", authorId)
+
+    search = addParams(search, params)
 
     search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
     if !noDetails {

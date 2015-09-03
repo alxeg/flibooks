@@ -1,7 +1,9 @@
 package utils
 
 import (
+    "encoding/json"
     "fmt"
+    "log"
     "regexp"
     "strings"
     "unicode"
@@ -49,4 +51,13 @@ func ParseBool(str string) (value bool, err error) {
         return false, nil
     }
     return false, fmt.Errorf("ParseBool %s", str)
+}
+
+func PrintJson(object interface{}) {
+    jsonBytes, err := json.MarshalIndent(object, "", "  ")
+    if err == nil {
+        fmt.Println(string(jsonBytes))
+    } else {
+        log.Fatalln("Invalid object")
+    }
 }
