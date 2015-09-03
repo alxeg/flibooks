@@ -34,6 +34,12 @@ func (service RestService) registerBookResource(container *restful.Container) {
         Param(ws.PathParameter("bookId", "identifier of the book").DataType("int")).
         Returns(200, "OK", models.Book{}))
 
+    ws.Route(ws.GET("/langs").
+        To(service.getLangs).
+        Doc("Get all available books languages").
+        Operation("getLangs").
+        Returns(200, "OK", []string{"en"}))
+
     ws.Route(ws.GET("/{bookId}/download").
         To(service.downloadBook).
         Doc("Download book content").
@@ -150,6 +156,18 @@ func (service RestService) searchBooks(request *restful.Request, response *restf
     log.Println("Searching books ", search)
 
     result, err := service.dataStore.FindBooks(search)
+    if err == nil && len(result) != 0 {
+        response.WriteEntity(result)
+    } else {
+        response.AddHeader("Content-Type", "text/plain")
+        response.WriteErrorString(http.StatusNotFound, "Nothing was found")
+    }
+}
+
+func (service RestService) getLangs(request *restful.Request, response *restful.Response) {
+    log.Println("Getting languages")
+
+    result, err := service.dataStore.GetLangs()
     if err == nil && len(result) != 0 {
         response.WriteEntity(result)
     } else {

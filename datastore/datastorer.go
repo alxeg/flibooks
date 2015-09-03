@@ -13,6 +13,7 @@ type DataStorer interface {
     GetAuthor(authorId uint) (*models.Author, error)
     ListAuthorBooks(authorId uint, noDetails bool, params models.Search) ([]models.Book, error)
     GetBook(bookId uint) (*models.Book, error)
+    GetLangs() ([]string, error)
     IsContainerExist(fileName string) bool
     Close()
 }

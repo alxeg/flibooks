@@ -172,6 +172,20 @@ func (store *dbStore) UpdateBook(book *models.Book) (*models.Book, error) {
     return book, nil
 }
 
+func (store *dbStore) GetLangs() ([]string, error) {
+    var result []string
+    found := []models.Book{}
+    store.db.Select("distinct books.lang").
+        Table("books").Where("lang <> ''").
+        Order("lang").
+        Find(&found)
+
+    for _, book := range found {
+        result = append(result, book.Lang)
+    }
+    return result, nil
+}
+
 func (store *dbStore) IsContainerExist(fileName string) bool {
     contObj := new(models.Container)
     store.db.Where("file_name = ?", fileName).First(&contObj)
