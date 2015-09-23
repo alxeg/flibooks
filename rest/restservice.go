@@ -135,6 +135,9 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
         }
         outName := authors + " - "
         if result.SerNo != "" {
+            if len(result.SerNo) == 1 {
+                result.SerNo = "0" + result.SerNo
+            }
             outName = outName + "[" + result.SerNo + "] "
         }
         outName = outName + result.Title + "." + result.Ext
