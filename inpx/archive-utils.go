@@ -43,7 +43,11 @@ func UnzipBookFile(dataDir string, book *models.Book, targetFolder string, renam
         for _, a := range book.Authors {
             authors = authors + a.Name
         }
-        outName = authors + " - " + book.Title + "." + book.Ext
+        outName = authors + " - "
+        if book.SerNo != "" {
+            outName = outName + "[" + book.SerNo + "] "
+        }
+        outName = outName + book.Title + "." + book.Ext
     } else {
         outName = book.File + "." + book.Ext
     }

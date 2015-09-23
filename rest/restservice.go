@@ -133,7 +133,11 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
         for _, a := range result.Authors {
             authors = authors + a.Name
         }
-        outName := authors + " - " + result.Title + "." + result.Ext
+        outName := authors + " - "
+        if result.SerNo != "" {
+            outName = outName + "[" + result.SerNo + "] "
+        }
+        outName = outName + result.Title + "." + result.Ext
 
         response.AddHeader("Content-Type", "application/octet-stream")
         response.AddHeader("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
