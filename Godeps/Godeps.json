@@ -1,39 +1,45 @@
 {
 	"ImportPath": "github.com/alxeg/flibooks",
-	"GoVersion": "go1.5.2",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v77",
 	"Deps": [
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
-			"Comment": "v1.1.3-80-g2cb1810",
-			"Rev": "2cb18102b6ecdca51fcfd9d39bc8738de278c1ea"
+			"Comment": "v1.2-103-gd916db2",
+			"Rev": "d916db217751a3fef55337f799c31fde4b8efcf1"
+		},
+		{
+			"ImportPath": "github.com/emicklei/go-restful/log",
+			"Comment": "v1.2-103-gd916db2",
+			"Rev": "d916db217751a3fef55337f799c31fde4b8efcf1"
 		},
 		{
 			"ImportPath": "github.com/go-sql-driver/mysql",
-			"Comment": "v1.2-118-g3dd7008",
-			"Rev": "3dd7008ac1529aca1bcd8a9db75228a71ba23cac"
+			"Comment": "v1.3-2-g2e00b5c",
+			"Rev": "2e00b5cd70399450106cec6431c2e2ce3cae5034"
 		},
 		{
 			"ImportPath": "github.com/jinzhu/gorm",
-			"Rev": "dd0d4d931f0d6b52e3c8df75496b0a1aaa5667e6"
+			"Comment": "v1.0-114-g7fb9b62",
+			"Rev": "7fb9b62c17d90320e0582a4720db025c1652fd6a"
 		},
 		{
 			"ImportPath": "github.com/jinzhu/inflection",
-			"Rev": "3272df6c21d04180007eb3349844c89a3856bc25"
-		},
-		{
-			"ImportPath": "github.com/lib/pq/hstore",
-			"Comment": "go1.0-cutoff-59-gb269bd0",
-			"Rev": "b269bd035a727d6c1081f76e7a239a1b00674c40"
+			"Rev": "1c35d901db3da928c72a72d8458480cc9ade058f"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-sqlite3",
-			"Comment": "v1.0.0-2-g0fa27b5",
-			"Rev": "0fa27b5cb05c4239ff23cbec3af1d56af75c1854"
+			"Comment": "v1.2.0-20-g7ed900a",
+			"Rev": "7ed900a7c4cc22315a007cc49821cce3baa7be0f"
 		},
 		{
 			"ImportPath": "github.com/ogier/pflag",
-			"Comment": "v0.0.1-4-g6f7159c",
-			"Rev": "6f7159c3154e7cd4ab30f6cc9c58fa3fd0f22325"
+			"Comment": "v0.0.1-7-g45c278a",
+			"Rev": "45c278ab3607870051a2ea9040bb85fcb8557481"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "a8c61998a557a37435f719980da368469c10bfed"
 		}
 	]
 }
