@@ -1,168 +1,168 @@
 package inpx
 
 import (
-    "archive/zip"
-    "bufio"
-    "fmt"
-    "github.com/alxeg/flibooks/datastore"
-    "github.com/alxeg/flibooks/models"
-    "io"
-    "log"
-    "runtime"
-    "strings"
+	"archive/zip"
+	"bufio"
+	"fmt"
+	"github.com/alxeg/flibooks/datastore"
+	"github.com/alxeg/flibooks/models"
+	"io"
+	"log"
+	"runtime"
+	"strings"
 )
 
 var (
-    versionFile  = "version.info"
-    numProcesses = runtime.NumCPU()
+	versionFile  = "version.info"
+	numProcesses = runtime.NumCPU()
 )
 
 func ReadInpxFile(dataFile string, store datastore.DataStorer) (err error) {
-    r, err := zip.OpenReader(dataFile)
-    if err != nil {
-        log.Fatal(err)
-        return err
-    }
-    defer r.Close()
+	r, err := zip.OpenReader(dataFile)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	defer r.Close()
 
-    files := make(chan *zip.File, 10)
-    done := make(chan struct{})
-    results := make(chan *models.Book, 100)
+	files := make(chan *zip.File, 10)
+	done := make(chan struct{})
+	results := make(chan *models.Book, 100)
 
-    go func() {
-        for _, file := range r.File {
-            files <- file
-        }
-        close(files)
-    }()
+	go func() {
+		for _, file := range r.File {
+			files <- file
+		}
+		close(files)
+	}()
 
-    log.Println("Paralleling in ", numProcesses)
-    for i := 0; i < numProcesses; i++ {
-        go processInp(files, results, done, store)
-    }
+	log.Println("Paralleling in ", numProcesses)
+	for i := 0; i < numProcesses; i++ {
+		go processInp(files, results, done, store)
+	}
 
-    waitAndProcessResults(done, results, store)
+	waitAndProcessResults(done, results, store)
 
-    store.Close()
+	store.Close()
 
-    return nil
+	return nil
 }
 
 func processInp(files <-chan *zip.File, results chan<- *models.Book, done chan<- struct{}, store datastore.DataStorer) {
 
-    defer func() {
-        done <- struct{}{}
-    }()
+	defer func() {
+		done <- struct{}{}
+	}()
 
-    for file := range files {
+	for file := range files {
 
-        if !strings.HasSuffix(file.FileInfo().Name(), ".inp") {
-            continue
-        }
+		if !strings.HasSuffix(file.FileInfo().Name(), ".inp") {
+			continue
+		}
 
-        zipContainer := strings.Replace(file.FileInfo().Name(), ".inp", ".zip", -1)
+		zipContainer := strings.Replace(file.FileInfo().Name(), ".inp", ".zip", -1)
 
-        update := false
-        if store.IsContainerExist(zipContainer) {
-            log.Printf("Container %s already exists in the db. Data will be updated...", file.FileInfo().Name())
-            update = true
-        }
+		update := false
+		if store.IsContainerExist(zipContainer) {
+			log.Printf("Container %s already exists in the db. Data will be updated...", file.FileInfo().Name())
+			update = true
+		}
 
-        log.Println("Processing file ", file.FileInfo().Name())
-        rc, err := file.Open()
-        if err == nil {
-            reader := bufio.NewReader(rc)
-            for {
-                line, err := reader.ReadString('\n')
-                if line != "" {
-                    book, bookErr := processBook(line, update)
-                    if bookErr == nil {
-                        book.Container = models.Container{FileName: strings.Replace(file.FileInfo().Name(), ".inp", ".zip", -1)}
-                        book.Update = update
-                        results <- book
-                    } else {
-                        log.Println(bookErr)
-                    }
-                }
-                if err != nil {
-                    if err != io.EOF {
-                        log.Println("failed to finish reading the file:", err)
-                    }
-                    break
-                }
-            }
+		log.Println("Processing file ", file.FileInfo().Name())
+		rc, err := file.Open()
+		if err == nil {
+			reader := bufio.NewReader(rc)
+			for {
+				line, err := reader.ReadString('\n')
+				if line != "" {
+					book, bookErr := processBook(line, update)
+					if bookErr == nil {
+						book.Container = models.Container{FileName: strings.Replace(file.FileInfo().Name(), ".inp", ".zip", -1)}
+						book.Update = update
+						results <- book
+					} else {
+						log.Println(bookErr)
+					}
+				}
+				if err != nil {
+					if err != io.EOF {
+						log.Println("failed to finish reading the file:", err)
+					}
+					break
+				}
+			}
 
-            rc.Close()
-        }
+			rc.Close()
+		}
 
-        if err != nil {
-            log.Println("Error occured while reading file", err)
-        }
-        log.Println("Done with ", file.FileInfo().Name())
-    }
+		if err != nil {
+			log.Println("Error occured while reading file", err)
+		}
+		log.Println("Done with ", file.FileInfo().Name())
+	}
 
 }
 
 func trimSlice(in []string) []string {
-    for len(in) > 0 && in[len(in)-1] == "" {
-        in = in[:len(in)-1]
-    }
-    return in
+	for len(in) > 0 && in[len(in)-1] == "" {
+		in = in[:len(in)-1]
+	}
+	return in
 }
 
 func processBook(line string, update bool) (book *models.Book, err error) {
-    elements := strings.Split(line, string([]byte{0x04}))
-    if len(elements) < 12 {
-        return book, fmt.Errorf("Illegal number of elements")
-    }
+	elements := strings.Split(line, string([]byte{0x04}))
+	if len(elements) < 12 {
+		return book, fmt.Errorf("Illegal number of elements")
+	}
 
-    book = new(models.Book)
-    if !update {
-        for _, author := range trimSlice(strings.Split(elements[0], ":")) {
-            book.Authors = append(book.Authors, models.Author{Name: strings.ToLower(author)})
-        }
-        for _, genre := range trimSlice(strings.Split(elements[1], ":")) {
-            book.Genres = append(book.Genres, models.Genre{GenreCode: genre})
-        }
-    }
-    book.Title = strings.ToLower(elements[2])
-    book.Series = elements[3]
-    book.SerNo = elements[4]
-    book.File = elements[5]
-    book.FileSize = elements[6]
-    book.LibId = elements[7]
-    book.Del = elements[8]
-    book.Ext = elements[9]
-    book.Date = elements[10]
-    book.Lang = elements[11]
-    return book, nil
+	book = new(models.Book)
+	if !update {
+		for _, author := range trimSlice(strings.Split(elements[0], ":")) {
+			book.Authors = append(book.Authors, models.Author{Name: strings.ToLower(author)})
+		}
+		for _, genre := range trimSlice(strings.Split(elements[1], ":")) {
+			book.Genres = append(book.Genres, models.Genre{GenreCode: genre})
+		}
+	}
+	book.Title = strings.ToLower(elements[2])
+	book.Series = elements[3]
+	book.SerNo = elements[4]
+	book.File = elements[5]
+	book.FileSize = elements[6]
+	book.LibId = elements[7]
+	book.Del = elements[8]
+	book.Ext = elements[9]
+	book.Date = elements[10]
+	book.Lang = elements[11]
+	return book, nil
 }
 
 func waitAndProcessResults(done <-chan struct{}, results <-chan *models.Book, store datastore.DataStorer) {
-    for working := numProcesses; working > 0; {
-        select {
-        case book := <-results:
-            if book.Update {
-                store.UpdateBook(book)
-            } else {
-                store.PutBook(book)
-            }
-        case <-done:
-            log.Println("Gorutine finished work")
-            working--
-        }
-    }
+	for working := numProcesses; working > 0; {
+		select {
+		case book := <-results:
+			if book.Update {
+				store.UpdateBook(book)
+			} else {
+				store.PutBook(book)
+			}
+		case <-done:
+			log.Println("Gorutine finished work")
+			working--
+		}
+	}
 
-    for {
-        select { // Nonblocking
-        case book := <-results:
-            if book.Update {
-                store.UpdateBook(book)
-            } else {
-                store.PutBook(book)
-            }
-        default:
-            return
-        }
-    }
+	for {
+		select { // Nonblocking
+		case book := <-results:
+			if book.Update {
+				store.UpdateBook(book)
+			} else {
+				store.PutBook(book)
+			}
+		default:
+			return
+		}
+	}
 }
