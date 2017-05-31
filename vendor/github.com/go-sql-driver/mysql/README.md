@@ -15,6 +15,7 @@ A MySQL-Driver for Go's [database/sql](https://golang.org/pkg/database/sql/) pac
       * [Address](#address)
       * [Parameters](#parameters)
       * [Examples](#examples)
+    * [Connection pool and timeouts](#connection-pool-and-timeouts)
     * [LOAD DATA LOCAL INFILE support](#load-data-local-infile-support)
     * [time.Time support](#timetime-support)
     * [Unicode support](#unicode-support)
@@ -260,11 +261,36 @@ Default:        false
 ##### `readTimeout`
 
 ```
-Type:           decimal number
+Type:           duration
 Default:        0
 ```
 
-I/O read timeout. The value must be a decimal number with an unit suffix ( *"ms"*, *"s"*, *"m"*, *"h"* ), such as *"30s"*, *"0.5m"* or *"1m30s"*.
+I/O read timeout. The value must be a decimal number with a unit suffix (*"ms"*, *"s"*, *"m"*, *"h"*), such as *"30s"*, *"0.5m"* or *"1m30s"*.
+
+##### `rejectReadOnly`
+
+```
+Type:           bool
+Valid Values:   true, false
+Default:        false
+```
+
+
+`rejectreadOnly=true` causes the driver to reject read-only connections. This
+is for a possible race condition during an automatic failover, where the mysql
+client gets connected to a read-only replica after the failover. 
+
+Note that this should be a fairly rare case, as an automatic failover normally
+happens when the primary is down, and the race condition shouldn't happen
+unless it comes back up online as soon as the failover is kicked off. On the
+other hand, when this happens, a MySQL application can get stuck on a
+read-only connection until restarted. It is however fairly easy to reproduce,
+for example, using a manual failover on AWS Aurora's MySQL-compatible cluster.
+
+If you are not relying on read-only transactions to reject writes that aren't
+supposed to happen, setting this on some MySQL providers (such as AWS Aurora)
+is safer for failovers.
+
 
 ##### `strict`
 
@@ -283,11 +309,11 @@ By default MySQL also treats notes as warnings. Use [`sql_notes=false`](http://d
 ##### `timeout`
 
 ```
-Type:           decimal number
+Type:           duration
 Default:        OS default
 ```
 
-*Driver* side connection timeout. The value must be a decimal number with an unit suffix ( *"ms"*, *"s"*, *"m"*, *"h"* ), such as *"30s"*, *"0.5m"* or *"1m30s"*. To set a server side timeout, use the parameter [`wait_timeout`](http://dev.mysql.com/doc/refman/5.6/en/server-system-variables.html#sysvar_wait_timeout).
+Timeout for establishing connections, aka dial timeout. The value must be a decimal number with a unit suffix (*"ms"*, *"s"*, *"m"*, *"h"*), such as *"30s"*, *"0.5m"* or *"1m30s"*.
 
 ##### `tls`
 
@@ -302,11 +328,11 @@ Default:        false
 ##### `writeTimeout`
 
 ```
-Type:           decimal number
+Type:           duration
 Default:        0
 ```
 
-I/O write timeout. The value must be a decimal number with an unit suffix ( *"ms"*, *"s"*, *"m"*, *"h"* ), such as *"30s"*, *"0.5m"* or *"1m30s"*.
+I/O write timeout. The value must be a decimal number with a unit suffix (*"ms"*, *"s"*, *"m"*, *"h"*), such as *"30s"*, *"0.5m"* or *"1m30s"*.
 
 
 ##### System Variables
@@ -379,6 +405,11 @@ No Database preselected:
 ```
 user:password@/
 ```
+
+
+### Connection pool and timeouts
+The connection pool is managed by Go's database/sql package. For details on how to configure the size of the pool and how long connections stay in the pool see `*DB.SetMaxOpenConns`, `*DB.SetMaxIdleConns`, and `*DB.SetConnMaxLifetime` in the [database/sql documentation](https://golang.org/pkg/database/sql/). The read, write, and dial timeouts for each individual connection are configured with the DSN parameters [`readTimeout`](#readtimeout), [`writeTimeout`](#writetimeout), and [`timeout`](#timeout), respectively.
+
 
 ### `LOAD DATA LOCAL INFILE` support
 For this feature you need direct access to the package. Therefore you must change the import path (no `_`):
