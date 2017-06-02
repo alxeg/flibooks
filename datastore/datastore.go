@@ -13,7 +13,7 @@ import (
 )
 
 type dbStore struct {
-	db *gorm.DB
+	db gorm.DB
 }
 
 func addParams(search *gorm.DB, params models.Search) *gorm.DB {
@@ -125,7 +125,6 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 	}
 	search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
 
-	result = store.fillBooksDetails(result, false)
 	return result, nil
 }
 
