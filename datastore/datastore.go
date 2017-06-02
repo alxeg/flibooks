@@ -115,7 +115,7 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 		search = search.Where("title LIKE ?", "%"+term+"%")
 	}
 	for _, term := range utils.SplitBySeparators(strings.ToLower(series)) {
-		search = search.Where("series LIKE ?", "%"+term+"%")
+		search = search.Where("LOWER(series) LIKE ?", "%"+term+"%")
 	}
 
 	search = addParams(search, params)
@@ -123,7 +123,7 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 	if limit > 0 {
 		search = search.Limit(limit)
 	}
-	search.Preload("Container").Order("title").Find(&result)
+	search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
 
 	result = store.fillBooksDetails(result, false)
 	return result, nil
@@ -233,7 +233,7 @@ func NewDBStore(config *models.DBConfig) (DataStorer, error) {
 	if err == nil {
 		db.DB()
 		db.AutoMigrate(&models.Author{}, &models.Container{}, &models.Genre{}, &models.Book{})
-		// db.LogMode(true)
+		db.LogMode(true)
 	}
 	result := new(dbStore)
 	result.db = db
