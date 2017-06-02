@@ -1,16 +1,17 @@
 package rest
 
 import (
-	"github.com/alxeg/flibooks/datastore"
-	"github.com/alxeg/flibooks/inpx"
-	"github.com/alxeg/flibooks/models"
-	"github.com/alxeg/flibooks/utils"
-	"github.com/emicklei/go-restful"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/alxeg/flibooks/datastore"
+	"github.com/alxeg/flibooks/inpx"
+	"github.com/alxeg/flibooks/models"
+	"github.com/alxeg/flibooks/utils"
+	"github.com/emicklei/go-restful"
 )
 
 type RestService struct {
@@ -53,8 +54,14 @@ func (service RestService) registerBookResource(container *restful.Container) {
 		Operation("searchBooks").
 		Returns(200, "OK", []models.Book{}))
 
+	ws.Route(ws.POST("/series").
+		To(service.searchSeries).
+		Doc("Search for the books").
+		Operation("searchBooks").
+		Returns(200, "OK", []models.Book{}))
+
 	ws.Route(ws.GET("/lib/{libId}").
-		To(service.getBooksByLibId).
+		To(service.getBooksByLibID).
 		Doc("Get books by libId").
 		Operation("getBooksByLibId").
 		Param(ws.PathParameter("libId", "libId of the book").DataType("string")).
@@ -101,9 +108,9 @@ func (service RestService) registerAuthorResource(container *restful.Container) 
 }
 
 func (service RestService) getBook(request *restful.Request, response *restful.Response) {
-	bookId, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
-	log.Println("Requesting book ", bookId)
-	result, err := service.dataStore.GetBook(uint(bookId))
+	bookID, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
+	log.Println("Requesting book ", bookID)
+	result, err := service.dataStore.GetBook(uint(bookID))
 	if err == nil {
 		response.WriteEntity(result)
 	} else {
@@ -112,10 +119,10 @@ func (service RestService) getBook(request *restful.Request, response *restful.R
 	}
 }
 
-func (service RestService) getBooksByLibId(request *restful.Request, response *restful.Response) {
-	libId := request.PathParameter("libId")
-	log.Println("Get books by libId ", libId)
-	result, err := service.dataStore.FindBooksByLibId(libId)
+func (service RestService) getBooksByLibID(request *restful.Request, response *restful.Response) {
+	libID := request.PathParameter("libId")
+	log.Println("Get books by libId ", libID)
+	result, err := service.dataStore.FindBooksByLibID(libID)
 	if err == nil && len(result) != 0 {
 		response.WriteEntity(result)
 	} else {
@@ -125,9 +132,9 @@ func (service RestService) getBooksByLibId(request *restful.Request, response *r
 }
 
 func (service RestService) downloadBook(request *restful.Request, response *restful.Response) {
-	bookId, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
-	log.Println("Downloading book ", bookId)
-	result, err := service.dataStore.GetBook(uint(bookId))
+	bookID, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
+	log.Println("Downloading book ", bookID)
+	result, err := service.dataStore.GetBook(uint(bookID))
 	if err == nil {
 		authors := ""
 		for _, a := range result.Authors {
@@ -158,6 +165,20 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 }
 
 func (service RestService) searchBooks(request *restful.Request, response *restful.Response) {
+	search := models.Search{}
+	request.ReadEntity(&search)
+	log.Println("Searching books ", search)
+
+	result, err := service.dataStore.FindBooks(search)
+	if err == nil && len(result) != 0 {
+		response.WriteEntity(result)
+	} else {
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusNotFound, "Nothing was found")
+	}
+}
+
+func (service RestService) searchSeries(request *restful.Request, response *restful.Response) {
 	search := models.Search{}
 	request.ReadEntity(&search)
 	log.Println("Searching books ", search)

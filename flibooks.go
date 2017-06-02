@@ -3,16 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"path/filepath"
+
 	"github.com/alxeg/flibooks/datastore"
 	"github.com/alxeg/flibooks/inpx"
 	"github.com/alxeg/flibooks/models"
 	"github.com/alxeg/flibooks/rest"
 	"github.com/alxeg/flibooks/utils"
 	flag "github.com/ogier/pflag"
-	"io/ioutil"
-	"log"
-	"os"
-	"path/filepath"
 )
 
 var (
@@ -76,7 +77,7 @@ func main() {
 		log.Printf("Opening %s to parse data\n", fileToParse)
 		inpx.ReadInpxFile(fileToParse, store)
 	} else if searchLibId != "" {
-		result, err := store.FindBooksByLibId(searchLibId)
+		result, err := store.FindBooksByLibID(searchLibId)
 		if err == nil && len(result) != 0 {
 			utils.PrintJson(result)
 		} else {

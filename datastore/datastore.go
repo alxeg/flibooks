@@ -103,10 +103,36 @@ func (store *dbStore) FindBooks(params models.Search) ([]models.Book, error) {
 	return result, nil
 }
 
-func (store *dbStore) FindBooksByLibId(libId string) ([]models.Book, error) {
+func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, error) {
+	title := params.Title
+	series := params.Series
+	limit := params.Limit
+
+	result := []models.Book{}
+	search := store.db.Select("distinct books.*").Table("books").
+		Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
+	for _, term := range utils.SplitBySeparators(strings.ToLower(title)) {
+		search = search.Where("title LIKE ?", "%"+term+"%")
+	}
+	for _, term := range utils.SplitBySeparators(strings.ToLower(series)) {
+		search = search.Where("series LIKE ?", "%"+term+"%")
+	}
+
+	search = addParams(search, params)
+
+	if limit > 0 {
+		search = search.Limit(limit)
+	}
+	search.Preload("Container").Order("title").Find(&result)
+
+	result = store.fillBooksDetails(result, false)
+	return result, nil
+}
+
+func (store *dbStore) FindBooksByLibID(libID string) ([]models.Book, error) {
 	result := []models.Book{}
 	store.db.Select("distinct books.*").Table("books").
-		Where("lib_id = ?", libId).
+		Where("lib_id = ?", libID).
 		Find(&result)
 	result = store.fillBooksDetails(result, true)
 	return result, nil
@@ -128,22 +154,21 @@ func (store *dbStore) FindAuthors(author string, limit int) ([]models.Author, er
 	return result, nil
 }
 
-func (store *dbStore) GetAuthor(authorId uint) (*models.Author, error) {
+func (store *dbStore) GetAuthor(authorID uint) (*models.Author, error) {
 	result := new(models.Author)
-	store.db.First(result, authorId)
+	store.db.First(result, authorID)
 	if result.ID > 0 {
 		result.Name = utils.UpperInitialAll(result.Name)
 		return result, nil
-	} else {
-		return nil, fmt.Errorf("No author found")
 	}
+	return nil, fmt.Errorf("No author found")
 }
 
-func (store *dbStore) ListAuthorBooks(authorId uint, noDetails bool, params models.Search) ([]models.Book, error) {
+func (store *dbStore) ListAuthorBooks(authorID uint, noDetails bool, params models.Search) ([]models.Book, error) {
 	result := []models.Book{}
 	search := store.db.Select("distinct books.*").Table("books").
 		Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
-	search = search.Where("authors.ID=?", authorId)
+	search = search.Where("authors.ID=?", authorID)
 
 	search = addParams(search, params)
 
@@ -154,15 +179,14 @@ func (store *dbStore) ListAuthorBooks(authorId uint, noDetails bool, params mode
 	return result, nil
 }
 
-func (store *dbStore) GetBook(bookId uint) (*models.Book, error) {
+func (store *dbStore) GetBook(bookID uint) (*models.Book, error) {
 	result := new(models.Book)
-	store.db.Preload("Container").First(result, bookId)
+	store.db.Preload("Container").First(result, bookID)
 	store.fillBookDetails(result, true)
 	if result.ID > 0 {
 		return result, nil
-	} else {
-		return nil, fmt.Errorf("No book found")
 	}
+	return nil, fmt.Errorf("No book found")
 }
 
 func (store *dbStore) UpdateBook(book *models.Book) (*models.Book, error) {
@@ -203,6 +227,7 @@ func (store *dbStore) IsContainerExist(fileName string) bool {
 func (store *dbStore) Close() {
 }
 
+// NewDBStore creates new instance of datastorer
 func NewDBStore(config *models.DBConfig) (DataStorer, error) {
 	db, err := gorm.Open(config.DBType, config.DBParams)
 	if err == nil {
