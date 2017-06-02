@@ -15,31 +15,31 @@
 		},
 		{
 			"ImportPath": "github.com/go-sql-driver/mysql",
-			"Comment": "v1.2-118-g3dd7008",
-			"Rev": "3dd7008ac1529aca1bcd8a9db75228a71ba23cac"
+			"Comment": "v1.3-21-ge3f0fdc",
+			"Rev": "e3f0fdcf52770a162d5a4540ddb8d9957ff456d1"
 		},
 		{
 			"ImportPath": "github.com/jinzhu/gorm",
-			"Rev": "dd0d4d931f0d6b52e3c8df75496b0a1aaa5667e6"
+			"Comment": "v1.0-156-g9acaa33",
+			"Rev": "9acaa33324bbcc78239a1c913d4f1292c12177b9"
 		},
 		{
-			"ImportPath": "github.com/lib/pq/hstore",
-			"Comment": "go1.0-cutoff-59-gb269bd0",
-			"Rev": "b269bd035a727d6c1081f76e7a239a1b00674c40"
+			"ImportPath": "github.com/jinzhu/inflection",
+			"Rev": "1c35d901db3da928c72a72d8458480cc9ade058f"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-sqlite3",
-			"Comment": "v1.0.0-2-g0fa27b5",
-			"Rev": "0fa27b5cb05c4239ff23cbec3af1d56af75c1854"
+			"Comment": "v1.2.0-82-g83772a7",
+			"Rev": "83772a7051f5e30d8e59746a9e43dfa706b72f3b"
 		},
 		{
 			"ImportPath": "github.com/ogier/pflag",
-			"Comment": "v0.0.1-4-g6f7159c",
-			"Rev": "6f7159c3154e7cd4ab30f6cc9c58fa3fd0f22325"
+			"Comment": "v0.0.1-7-g45c278a",
+			"Rev": "45c278ab3607870051a2ea9040bb85fcb8557481"
 		},
 		{
-			"ImportPath": "github.com/qor/inflection",
-			"Rev": "1c35d901db3da928c72a72d8458480cc9ade058f"
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "3da985ce5951d99de868be4385f21ea6c2b22f24"
 		}
 	]
 }

@@ -13,7 +13,7 @@ import (
 )
 
 type dbStore struct {
-	db gorm.DB
+	db *gorm.DB
 }
 
 func addParams(search *gorm.DB, params models.Search) *gorm.DB {
@@ -83,7 +83,7 @@ func (store *dbStore) FindBooks(params models.Search) ([]models.Book, error) {
 	// utils.PrintJson(params)
 
 	result := []models.Book{}
-	search := store.db.Select("distinct books.*").Table("books").
+	search := store.db.Select("books.*").Table("books").
 		Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
 	for _, term := range utils.SplitBySeparators(strings.ToLower(title)) {
 		search = search.Where("title LIKE ?", "%"+term+"%")
@@ -92,7 +92,7 @@ func (store *dbStore) FindBooks(params models.Search) ([]models.Book, error) {
 		search = search.Where("name LIKE ?", "%"+term+"%")
 	}
 
-	search = addParams(search, params)
+	search = addParams(search, params).Group("books.id")
 
 	if limit > 0 {
 		search = search.Limit(limit)
@@ -109,7 +109,7 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 	limit := params.Limit
 
 	result := []models.Book{}
-	search := store.db.Select("distinct books.*").Table("books").
+	search := store.db.Select("books.*").Table("books").
 		Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
 	for _, term := range utils.SplitBySeparators(strings.ToLower(title)) {
 		search = search.Where("title LIKE ?", "%"+term+"%")
@@ -118,7 +118,7 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 		search = search.Where("LOWER(series) LIKE ?", "%"+term+"%")
 	}
 
-	search = addParams(search, params)
+	search = addParams(search, params).Group("books.id")
 
 	if limit > 0 {
 		search = search.Limit(limit)
@@ -130,7 +130,7 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 
 func (store *dbStore) FindBooksByLibID(libID string) ([]models.Book, error) {
 	result := []models.Book{}
-	store.db.Select("distinct books.*").Table("books").
+	store.db.Select("books.*").Table("books").
 		Where("lib_id = ?", libID).
 		Find(&result)
 	result = store.fillBooksDetails(result, true)
@@ -165,11 +165,11 @@ func (store *dbStore) GetAuthor(authorID uint) (*models.Author, error) {
 
 func (store *dbStore) ListAuthorBooks(authorID uint, noDetails bool, params models.Search) ([]models.Book, error) {
 	result := []models.Book{}
-	search := store.db.Select("distinct books.*").Table("books").
+	search := store.db.Select("books.*").Table("books").
 		Joins("left join book_authors on books.id=book_authors.book_id left join authors on authors.id=book_authors.author_id")
 	search = search.Where("authors.ID=?", authorID)
 
-	search = addParams(search, params)
+	search = addParams(search, params).Group("books.id")
 
 	search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
 	if !noDetails {

@@ -9,9 +9,8 @@
 package mysql
 
 import (
-	"crypto/tls"
 	"database/sql/driver"
-	"errors"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -23,9 +22,10 @@ type mysqlConn struct {
 	netConn          net.Conn
 	affectedRows     uint64
 	insertId         uint64
-	cfg              *config
-	maxPacketAllowed int
+	cfg              *Config
+	maxAllowedPacket int
 	maxWriteSize     int
+	writeTimeout     time.Duration
 	flags            clientFlag
 	status           statusFlag
 	sequence         uint8
@@ -33,28 +33,9 @@ type mysqlConn struct {
 	strict           bool
 }
 
-type config struct {
-	user                    string
-	passwd                  string
-	net                     string
-	addr                    string
-	dbname                  string
-	params                  map[string]string
-	loc                     *time.Location
-	tls                     *tls.Config
-	timeout                 time.Duration
-	collation               uint8
-	allowAllFiles           bool
-	allowOldPasswords       bool
-	allowCleartextPasswords bool
-	clientFoundRows         bool
-	columnsWithAlias        bool
-	interpolateParams       bool
-}
-
 // Handles parameters set in DSN after the connection is established
 func (mc *mysqlConn) handleParams() (err error) {
-	for param, val := range mc.cfg.params {
+	for param, val := range mc.cfg.Params {
 		switch param {
 		// Charset
 		case "charset":
@@ -69,27 +50,6 @@ func (mc *mysqlConn) handleParams() (err error) {
 			if err != nil {
 				return
 			}
-
-		// time.Time parsing
-		case "parseTime":
-			var isBool bool
-			mc.parseTime, isBool = readBool(val)
-			if !isBool {
-				return errors.New("Invalid Bool value: " + val)
-			}
-
-		// Strict mode
-		case "strict":
-			var isBool bool
-			mc.strict, isBool = readBool(val)
-			if !isBool {
-				return errors.New("Invalid Bool value: " + val)
-			}
-
-		// Compression
-		case "compress":
-			err = errors.New("Compression not implemented yet")
-			return
 
 		// System Vars
 		default:
@@ -120,18 +80,27 @@ func (mc *mysqlConn) Close() (err error) {
 	// Makes Close idempotent
 	if mc.netConn != nil {
 		err = mc.writeCommandPacket(comQuit)
-		if err == nil {
-			err = mc.netConn.Close()
-		} else {
-			mc.netConn.Close()
+	}
+
+	mc.cleanup()
+
+	return
+}
+
+// Closes the network connection and unsets internal variables. Do not call this
+// function after successfully authentication, call Close instead. This function
+// is called before auth or on auth failure because MySQL will have already
+// closed the network connection.
+func (mc *mysqlConn) cleanup() {
+	// Makes cleanup idempotent
+	if mc.netConn != nil {
+		if err := mc.netConn.Close(); err != nil {
+			errLog.Print(err)
 		}
 		mc.netConn = nil
 	}
-
 	mc.cfg = nil
-	mc.buf.rd = nil
-
-	return
+	mc.buf.nc = nil
 }
 
 func (mc *mysqlConn) Prepare(query string) (driver.Stmt, error) {
@@ -167,6 +136,11 @@ func (mc *mysqlConn) Prepare(query string) (driver.Stmt, error) {
 }
 
 func (mc *mysqlConn) interpolateParams(query string, args []driver.Value) (string, error) {
+	// Number of ? should be same to len(args)
+	if strings.Count(query, "?") != len(args) {
+		return "", driver.ErrSkip
+	}
+
 	buf := mc.buf.takeCompleteBuffer()
 	if buf == nil {
 		// can not take the buffer. Something must be wrong with the connection
@@ -208,7 +182,7 @@ func (mc *mysqlConn) interpolateParams(query string, args []driver.Value) (strin
 			if v.IsZero() {
 				buf = append(buf, "'0000-00-00'"...)
 			} else {
-				v := v.In(mc.cfg.loc)
+				v := v.In(mc.cfg.Loc)
 				v = v.Add(time.Nanosecond * 500) // To round under microsecond
 				year := v.Year()
 				year100 := year / 100
@@ -253,7 +227,7 @@ func (mc *mysqlConn) interpolateParams(query string, args []driver.Value) (strin
 			if v == nil {
 				buf = append(buf, "NULL"...)
 			} else {
-				buf = append(buf, '\'')
+				buf = append(buf, "_binary'"...)
 				if mc.status&statusNoBackslashEscapes == 0 {
 					buf = escapeBytesBackslash(buf, v)
 				} else {
@@ -273,7 +247,7 @@ func (mc *mysqlConn) interpolateParams(query string, args []driver.Value) (strin
 			return "", driver.ErrSkip
 		}
 
-		if len(buf)+4 > mc.maxPacketAllowed {
+		if len(buf)+4 > mc.maxAllowedPacket {
 			return "", driver.ErrSkip
 		}
 	}
@@ -289,7 +263,7 @@ func (mc *mysqlConn) Exec(query string, args []driver.Value) (driver.Result, err
 		return nil, driver.ErrBadConn
 	}
 	if len(args) != 0 {
-		if !mc.cfg.interpolateParams {
+		if !mc.cfg.InterpolateParams {
 			return nil, driver.ErrSkip
 		}
 		// try to interpolate the parameters to save extra roundtrips for preparing and closing a statement
@@ -298,7 +272,6 @@ func (mc *mysqlConn) Exec(query string, args []driver.Value) (driver.Result, err
 			return nil, err
 		}
 		query = prepared
-		args = nil
 	}
 	mc.affectedRows = 0
 	mc.insertId = 0
@@ -316,22 +289,29 @@ func (mc *mysqlConn) Exec(query string, args []driver.Value) (driver.Result, err
 // Internal function to execute commands
 func (mc *mysqlConn) exec(query string) error {
 	// Send command
-	err := mc.writeCommandPacketStr(comQuery, query)
-	if err != nil {
+	if err := mc.writeCommandPacketStr(comQuery, query); err != nil {
 		return err
 	}
 
 	// Read Result
 	resLen, err := mc.readResultSetHeaderPacket()
-	if err == nil && resLen > 0 {
-		if err = mc.readUntilEOF(); err != nil {
+	if err != nil {
+		return err
+	}
+
+	if resLen > 0 {
+		// columns
+		if err := mc.readUntilEOF(); err != nil {
 			return err
 		}
 
-		err = mc.readUntilEOF()
+		// rows
+		if err := mc.readUntilEOF(); err != nil {
+			return err
+		}
 	}
 
-	return err
+	return mc.discardResults()
 }
 
 func (mc *mysqlConn) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -340,7 +320,7 @@ func (mc *mysqlConn) Query(query string, args []driver.Value) (driver.Rows, erro
 		return nil, driver.ErrBadConn
 	}
 	if len(args) != 0 {
-		if !mc.cfg.interpolateParams {
+		if !mc.cfg.InterpolateParams {
 			return nil, driver.ErrSkip
 		}
 		// try client-side prepare to reduce roundtrip
@@ -349,7 +329,6 @@ func (mc *mysqlConn) Query(query string, args []driver.Value) (driver.Rows, erro
 			return nil, err
 		}
 		query = prepared
-		args = nil
 	}
 	// Send command
 	err := mc.writeCommandPacketStr(comQuery, query)
@@ -362,11 +341,17 @@ func (mc *mysqlConn) Query(query string, args []driver.Value) (driver.Rows, erro
 			rows.mc = mc
 
 			if resLen == 0 {
-				// no columns, no more data
-				return emptyRows{}, nil
+				rows.rs.done = true
+
+				switch err := rows.NextResultSet(); err {
+				case nil, io.EOF:
+					return rows, nil
+				default:
+					return nil, err
+				}
 			}
 			// Columns
-			rows.columns, err = mc.readColumns(resLen)
+			rows.rs.columns, err = mc.readColumns(resLen)
 			return rows, err
 		}
 	}
@@ -386,6 +371,7 @@ func (mc *mysqlConn) getSystemVar(name string) ([]byte, error) {
 	if err == nil {
 		rows := new(textRows)
 		rows.mc = mc
+		rows.rs.columns = []mysqlField{{fieldType: fieldTypeVarChar}}
 
 		if resLen > 0 {
 			// Columns
