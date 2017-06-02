@@ -181,9 +181,9 @@ func (service RestService) searchBooks(request *restful.Request, response *restf
 func (service RestService) searchSeries(request *restful.Request, response *restful.Response) {
 	search := models.Search{}
 	request.ReadEntity(&search)
-	log.Println("Searching books ", search)
+	log.Println("Searching book series ", search)
 
-	result, err := service.dataStore.FindBooks(search)
+	result, err := service.dataStore.FindBooksSeries(search)
 	if err == nil && len(result) != 0 {
 		response.WriteEntity(result)
 	} else {
