@@ -187,10 +187,10 @@ func (service RestService) downloadBooksArchive(request *restful.Request, respon
 						if err == nil {
 							inpx.UnzipBookToWriter(service.dataDir, book, entry)
 						} else {
-							log.Fatalln(err)
+							log.Println("Failed to compress ", book.GetFullFilename())
 						}
 					} else {
-						log.Fatalln(err)
+						log.Println("Failed to get book ", id)
 					}
 				} else {
 					done <- true
