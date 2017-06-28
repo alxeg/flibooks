@@ -1,11 +1,13 @@
 package rest
 
 import (
+	"archive/zip"
 	"log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alxeg/flibooks/datastore"
 	"github.com/alxeg/flibooks/inpx"
@@ -46,6 +48,12 @@ func (service RestService) registerBookResource(container *restful.Container) {
 		Doc("Download book content").
 		Operation("downloadBook").
 		Param(ws.PathParameter("bookId", "identifier of the book").DataType("int")).
+		Returns(200, "OK", models.Book{}))
+
+	ws.Route(ws.GET("/archive").
+		To(service.downloadBooksArchive).
+		Doc("Download books in single zip file").
+		Operation("downloadBooksArchive").
 		Returns(200, "OK", models.Book{}))
 
 	ws.Route(ws.POST("/search").
@@ -115,7 +123,7 @@ func (service RestService) getBook(request *restful.Request, response *restful.R
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "Book wasn't found")
+		response.WriteErrorString(http.StatusNotFound, "Book wasn't found\n")
 	}
 }
 
@@ -127,7 +135,7 @@ func (service RestService) getBooksByLibID(request *restful.Request, response *r
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "Nothing was found")
+		response.WriteErrorString(http.StatusNotFound, "Nothing was found\n")
 	}
 }
 
@@ -136,18 +144,7 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 	log.Println("Downloading book ", bookID)
 	result, err := service.dataStore.GetBook(uint(bookID))
 	if err == nil {
-		authors := ""
-		for _, a := range result.Authors {
-			authors = authors + a.Name
-		}
-		outName := authors + " - "
-		if result.SerNo != "" {
-			if len(result.SerNo) == 1 {
-				result.SerNo = "0" + result.SerNo
-			}
-			outName = outName + "[" + result.SerNo + "] "
-		}
-		outName = outName + result.Title + "." + result.Ext
+		outName := result.GetFullFilename()
 
 		response.AddHeader("Content-Type", "application/octet-stream")
 		response.AddHeader("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
@@ -156,11 +153,60 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 		err := inpx.UnzipBookToWriter(service.dataDir, result, response)
 		if err != nil {
 			response.AddHeader("Content-Type", "text/plain")
-			response.WriteErrorString(http.StatusNotFound, "Book wasn't found")
+			response.WriteErrorString(http.StatusNotFound, "Book wasn't found\n")
 		}
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "Book wasn't found")
+		response.WriteErrorString(http.StatusNotFound, "Book wasn't found\n")
+	}
+}
+
+func (service RestService) downloadBooksArchive(request *restful.Request, response *restful.Response) {
+	request.Request.ParseForm()
+	ids := request.Request.Form["id"]
+	if len(ids) > 0 {
+		response.Header().Set("Content-Type", "application/zip")
+		response.Header().Set("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
+			"flibooks-"+time.Now().Format("2006-01-02T15-04-05")+".zip"), "+", "%20", -1))
+		zipWriter := zip.NewWriter(response)
+
+		idsChan := make(chan string)
+		done := make(chan bool)
+
+		go func() {
+			for {
+				id, more := <-idsChan
+				if more {
+					bookID, _ := strconv.ParseUint(id, 0, 32)
+					book, err := service.dataStore.GetBook(uint(bookID))
+					if err == nil {
+						// zipHeader := &zip.FileHeader{Name: book.GetFullFilename(), Method: zip.Deflate, Flags: 0x800}
+						// entry, err := zipWriter.CreateHeader(zipHeader)
+						entry, err := zipWriter.Create(book.GetFullFilename())
+
+						if err == nil {
+							inpx.UnzipBookToWriter(service.dataDir, book, entry)
+						} else {
+							log.Fatalln(err)
+						}
+					} else {
+						log.Fatalln(err)
+					}
+				} else {
+					done <- true
+					return
+				}
+			}
+		}()
+		for _, id := range ids {
+			idsChan <- id
+		}
+		close(idsChan)
+		<-done
+		zipWriter.Close()
+	} else {
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusBadRequest, "No parameters passed\n")
 	}
 }
 
@@ -174,7 +220,7 @@ func (service RestService) searchBooks(request *restful.Request, response *restf
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "Nothing was found")
+		response.WriteErrorString(http.StatusNotFound, "Nothing was found\n")
 	}
 }
 
@@ -188,7 +234,7 @@ func (service RestService) searchSeries(request *restful.Request, response *rest
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "Nothing was found")
+		response.WriteErrorString(http.StatusNotFound, "Nothing was found\n")
 	}
 }
 
@@ -200,7 +246,7 @@ func (service RestService) getLangs(request *restful.Request, response *restful.
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "Nothing was found")
+		response.WriteErrorString(http.StatusNotFound, "Nothing was found\n")
 	}
 }
 
@@ -214,7 +260,7 @@ func (service RestService) searchAuthors(request *restful.Request, response *res
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "Nothing was found")
+		response.WriteErrorString(http.StatusNotFound, "Nothing was found\n")
 	}
 }
 
@@ -227,7 +273,7 @@ func (service RestService) getAuthor(request *restful.Request, response *restful
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "No author was found")
+		response.WriteErrorString(http.StatusNotFound, "No author was found\n")
 	}
 }
 
@@ -242,7 +288,7 @@ func (service RestService) listAuthorsBooks(request *restful.Request, response *
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "No books was found")
+		response.WriteErrorString(http.StatusNotFound, "No books was found\n")
 	}
 }
 
@@ -259,7 +305,7 @@ func (service RestService) listAuthorsBooksPost(request *restful.Request, respon
 		response.WriteEntity(result)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "No books was found")
+		response.WriteErrorString(http.StatusNotFound, "No books was found\n")
 	}
 }
 
@@ -269,7 +315,7 @@ func (service RestService) StartListen() {
 	log.Fatal(server.ListenAndServe())
 }
 
-func NewRestService(listen string, dataStore datastore.DataStorer, dataDir string) *RestService {
+func NewRestService(listen string, dataStore datastore.DataStorer, dataDir string) RestServer {
 	service := new(RestService)
 	service.listen = listen
 	service.dataStore = dataStore

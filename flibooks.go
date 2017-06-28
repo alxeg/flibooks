@@ -69,6 +69,8 @@ func main() {
 	}
 
 	store, err := datastore.NewDBStore(readConfig(dbConfig))
+	defer store.Close()
+
 	if err != nil {
 		log.Fatalln("Failed to open database")
 	}
@@ -121,6 +123,7 @@ func main() {
 	} else {
 		fmt.Println("Additional parameters are:")
 		flag.PrintDefaults()
+		// rest.NewGorillaService(listen, store, dataDir).StartListen()
 		rest.NewRestService(listen, store, dataDir).StartListen()
 	}
 }

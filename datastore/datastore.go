@@ -7,9 +7,9 @@ import (
 
 	"github.com/alxeg/flibooks/models"
 	"github.com/alxeg/flibooks/utils"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 )
 
 type dbStore struct {
@@ -224,6 +224,7 @@ func (store *dbStore) IsContainerExist(fileName string) bool {
 }
 
 func (store *dbStore) Close() {
+	store.db.Close()
 }
 
 // NewDBStore creates new instance of datastorer
