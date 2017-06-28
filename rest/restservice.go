@@ -180,9 +180,9 @@ func (service RestService) downloadBooksArchive(request *restful.Request, respon
 					bookID, _ := strconv.ParseUint(id, 0, 32)
 					book, err := service.dataStore.GetBook(uint(bookID))
 					if err == nil {
-						// zipHeader := &zip.FileHeader{Name: book.GetFullFilename(), Method: zip.Deflate, Flags: 0x800}
-						// entry, err := zipWriter.CreateHeader(zipHeader)
-						entry, err := zipWriter.Create(book.GetFullFilename())
+						zipHeader := &zip.FileHeader{Name: book.GetFullFilename(), Method: zip.Deflate, Flags: 0x800}
+						entry, err := zipWriter.CreateHeader(zipHeader)
+						// entry, err := zipWriter.Create(book.GetFullFilename())
 
 						if err == nil {
 							inpx.UnzipBookToWriter(service.dataDir, book, entry)
