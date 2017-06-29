@@ -40,6 +40,9 @@ func (book *Book) GetFullFilename() string {
 		authors = authors + a.Name
 	}
 	authors = re.ReplaceAllString(authors, "$1")
+	if len(authors) > 100 {
+		authors = string([]rune(authors)[0:100]) + `…`
+	}
 	outName := authors + " - "
 	if book.SerNo != "" && book.SerNo != "0" {
 		if len(book.SerNo) == 1 {
