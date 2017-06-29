@@ -1,6 +1,12 @@
 package models
 
-import "github.com/alxeg/flibooks/utils"
+import (
+	"regexp"
+
+	"github.com/alxeg/flibooks/utils"
+)
+
+var re = regexp.MustCompile(`^[\s\P{L}]*(.*?)[\P{L}\s]*$`)
 
 type Book struct {
 	ID          uint      `gorm:"primary_key"`
@@ -33,6 +39,7 @@ func (book *Book) GetFullFilename() string {
 	for _, a := range book.Authors {
 		authors = authors + a.Name
 	}
+	authors = re.ReplaceAllString(authors, "$1")
 	outName := authors + " - "
 	if book.SerNo != "" && book.SerNo != "0" {
 		if len(book.SerNo) == 1 {
@@ -40,5 +47,6 @@ func (book *Book) GetFullFilename() string {
 		}
 		outName = outName + "[" + book.SerNo + "] "
 	}
+
 	return outName + book.Title + "." + book.Ext
 }
