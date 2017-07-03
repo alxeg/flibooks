@@ -6,7 +6,7 @@ import (
 	"github.com/alxeg/flibooks/utils"
 )
 
-var re = regexp.MustCompile(`^[\s\P{L}]*(.*?)[\P{L}\s]*$`)
+var re = regexp.MustCompile(`^[\s\,]*(.*?)[\,\s]*$`)
 
 type Book struct {
 	ID          uint      `gorm:"primary_key"`
