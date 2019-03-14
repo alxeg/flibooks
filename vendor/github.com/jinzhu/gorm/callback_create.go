@@ -32,8 +32,18 @@ func beforeCreateCallback(scope *Scope) {
 func updateTimeStampForCreateCallback(scope *Scope) {
 	if !scope.HasError() {
 		now := NowFunc()
-		scope.SetColumn("CreatedAt", now)
-		scope.SetColumn("UpdatedAt", now)
+
+		if createdAtField, ok := scope.FieldByName("CreatedAt"); ok {
+			if createdAtField.IsBlank {
+				createdAtField.Set(now)
+			}
+		}
+
+		if updatedAtField, ok := scope.FieldByName("UpdatedAt"); ok {
+			if updatedAtField.IsBlank {
+				updatedAtField.Set(now)
+			}
+		}
 	}
 }
 
@@ -49,7 +59,7 @@ func createCallback(scope *Scope) {
 
 		for _, field := range scope.Fields() {
 			if scope.changeableField(field) {
-				if field.IsNormal {
+				if field.IsNormal && !field.IsIgnored {
 					if field.IsBlank && field.HasDefaultValue {
 						blankColumnsWithDefaultValue = append(blankColumnsWithDefaultValue, scope.Quote(field.DBName))
 						scope.InstanceSet("gorm:blank_columns_with_default_value", blankColumnsWithDefaultValue)
@@ -87,8 +97,9 @@ func createCallback(scope *Scope) {
 
 		if len(columns) == 0 {
 			scope.Raw(fmt.Sprintf(
-				"INSERT INTO %v DEFAULT VALUES%v%v",
+				"INSERT INTO %v %v%v%v",
 				quotedTableName,
+				scope.Dialect().DefaultValueStr(),
 				addExtraSpaceIfExist(extraOption),
 				addExtraSpaceIfExist(lastInsertIDReturningSuffix),
 			))
