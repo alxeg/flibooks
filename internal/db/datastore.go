@@ -83,7 +83,7 @@ func (store *dbStore) FindBooks(params models.Search) ([]models.Book, error) {
 	if limit > 0 {
 		search = search.Limit(limit)
 	}
-	search.Preload("Container").Order("title").Find(&result)
+	search.Preload("Container").Preload("Authors").Order("title").Find(&result)
 
 	// result = store.fillBooksDetails(result, false)
 	return result, nil
