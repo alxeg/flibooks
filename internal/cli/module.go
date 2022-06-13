@@ -32,7 +32,7 @@ type Params struct {
 
 	AppConfig     *config.App
 	ParserCommand *parse.Cmd
-	ServeCommand  *serve.Cmd
+	ServerCommand *serve.Cmd
 
 	Shutdowner fx.Shutdowner
 }
@@ -54,7 +54,7 @@ func NewCli(p Params) (*Cli, error) {
 	var configPath string
 	rootCmd.PersistentFlags().StringVar(&configPath, config.ConfigPathArg, "", "Path to config file")
 	rootCmd.AddCommand(p.ParserCommand.Command)
-	rootCmd.AddCommand(p.ServeCommand.Command)
+	rootCmd.AddCommand(p.ServerCommand.Command)
 
 	mainApp := &Cli{
 		rootCmd: rootCmd,
@@ -63,7 +63,7 @@ func NewCli(p Params) (*Cli, error) {
 	return mainApp, nil
 }
 
-// RegisterRoutes registers the api routes and starts the http server
+// StartCli starts the app
 func StartCli(app *Cli, lc fx.Lifecycle) {
 	lc.Append(fx.Hook{
 		OnStart: func(c context.Context) error {
