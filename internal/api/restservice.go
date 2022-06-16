@@ -2,9 +2,14 @@ package api
 
 import (
 	"archive/zip"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -14,9 +19,18 @@ import (
 
 	"github.com/alxeg/flibooks/internal/db"
 	"github.com/alxeg/flibooks/internal/db/orm"
+	"github.com/alxeg/flibooks/internal/services/convert"
 	"github.com/alxeg/flibooks/pkg/inpx"
 	"github.com/alxeg/flibooks/pkg/inpx/models"
 	"github.com/alxeg/flibooks/pkg/utils"
+)
+
+var (
+	allowedFormats = map[string]string{
+		"epub": "application/epub+zip",
+		"azw3": "application/vnd.amazon.ebook",
+		"mobi": "application/vnd.amazon.mobi8-ebook",
+	}
 )
 
 type RestService struct {
@@ -24,6 +38,7 @@ type RestService struct {
 	dataDir   string
 	dataStore db.DataStorer
 	container *restful.Container
+	converter convert.Converter
 }
 
 func (service RestService) registerBookResource(container *restful.Container) {
@@ -143,26 +158,71 @@ func (service RestService) getBooksByLibID(request *restful.Request, response *r
 }
 
 func (service RestService) downloadBook(request *restful.Request, response *restful.Response) {
+	answerError := func(status int, reason string, params ...any) {
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(status, fmt.Sprint(reason+"\n", params))
+	}
+
 	bookID, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
+	outFormat := request.QueryParameter("format")
+
 	log.Println("Downloading book ", bookID)
 	result, err := service.dataStore.GetBook(uint(bookID))
-	if err == nil {
-		outName := result.GetFullFilename()
+	if err != nil {
+		answerError(http.StatusNotFound, "Book hasn't been found")
+		return
+	}
+	outName := result.GetFullFilename()
+	extBook := &models.Book{}
+	copier.Copy(extBook, result)
 
+	if _, ok := allowedFormats[outFormat]; !ok {
 		response.AddHeader("Content-Type", "application/octet-stream")
 		response.AddHeader("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
 			utils.ReplaceUnsupported(outName)), "+", "%20", -1))
 
-		extBook := &models.Book{}
-		copier.Copy(extBook, result)
 		err := inpx.UnzipBookToWriter(service.dataDir, extBook, response)
 		if err != nil {
-			response.AddHeader("Content-Type", "text/plain")
-			response.WriteErrorString(http.StatusNotFound, "Book wasn't found\n")
+			answerError(http.StatusNotFound, "Cannot retrieve the book file: %s", err.Error())
+			return
 		}
 	} else {
-		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(http.StatusNotFound, "Book wasn't found\n")
+		convName := strings.TrimSuffix(outName, filepath.Ext(outName)) + "." + outFormat
+		tmpDir, _ := ioutil.TempDir("", "fliconvert")
+		defer os.RemoveAll(tmpDir)
+
+		srcPath := path.Join(tmpDir, "file.fb2")
+		src, err := os.Create(srcPath)
+		if err != nil {
+			answerError(http.StatusNotFound, "Cannot open the src file for writing: %s", err.Error())
+			return
+		}
+		err = func() error {
+			defer src.Close()
+			return inpx.UnzipBookToWriter(service.dataDir, extBook, src)
+		}()
+		if err != nil {
+			answerError(http.StatusNotFound, "Cannot retrieve the book file: %s", err.Error())
+			return
+		}
+
+		err = service.converter.Convert(srcPath, tmpDir, outFormat)
+		if err != nil {
+			answerError(http.StatusNotFound, "Cannot convert the book to %s format: %s", outFormat, err.Error())
+			return
+		}
+
+		fileBytes, err := ioutil.ReadFile(path.Join(tmpDir, "file."+outFormat))
+		if err != nil {
+			answerError(http.StatusNotFound, "Cannot read the converted file: %s", outFormat, err.Error())
+			return
+		}
+
+		response.AddHeader("Content-Type", allowedFormats[outFormat])
+		response.AddHeader("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
+			utils.ReplaceUnsupported(convName)), "+", "%20", -1))
+
+		response.Write(fileBytes)
 	}
 }
 
@@ -322,13 +382,14 @@ func (service RestService) StartListen() {
 	log.Fatal(server.ListenAndServe())
 }
 
-func NewRestService(listen string, dataStore db.DataStorer, dataDir string) RestServer {
+func NewRestService(listen string, dataStore db.DataStorer, dataDir string, converter convert.Converter) RestServer {
 	service := new(RestService)
 	service.listen = listen
 	service.dataStore = dataStore
 	service.dataDir = dataDir
 	service.container = restful.NewContainer()
 	service.container.Router(restful.CurlyRouter{})
+	service.converter = converter
 
 	service.registerBookResource(service.container)
 	service.registerAuthorResource(service.container)

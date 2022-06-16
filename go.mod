@@ -4,9 +4,11 @@ go 1.18
 
 require (
 	github.com/emicklei/go-restful v2.15.0+incompatible
+	github.com/go-cmd/cmd v1.4.1
 	github.com/jinzhu/copier v0.3.5
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/ogier/pflag v0.0.1
+	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.12.0
 	go.uber.org/fx v1.17.1

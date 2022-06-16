@@ -28,10 +28,15 @@ type Data struct {
 	Dir string
 }
 
+type Fb2C struct {
+	Path string
+}
+
 type App struct {
 	Database Database
 	Server   Server
 	Data     Data
+	Fb2C     Fb2C
 }
 
 var Module = fx.Provide(NewAppConfig)
