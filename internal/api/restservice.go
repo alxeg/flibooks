@@ -160,7 +160,9 @@ func (service RestService) getBooksByLibID(request *restful.Request, response *r
 func (service RestService) downloadBook(request *restful.Request, response *restful.Response) {
 	answerError := func(status int, reason string, params ...any) {
 		response.AddHeader("Content-Type", "text/plain")
-		response.WriteErrorString(status, fmt.Sprint(reason+"\n", params))
+		errorStr := fmt.Sprint(reason+"\n", params)
+		log.Println(errorStr)
+		response.WriteErrorString(status, errorStr)
 	}
 
 	bookID, _ := strconv.ParseUint(request.PathParameter("bookId"), 0, 32)
@@ -211,8 +213,8 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 			answerError(http.StatusNotFound, "Cannot convert the book to %s format: %s", outFormat, err.Error())
 			return
 		}
-
-		fileBytes, err := ioutil.ReadFile(path.Join(tmpDir, "file."+outFormat))
+		dstPath := path.Join(tmpDir, "file."+outFormat)
+		fileBytes, err := ioutil.ReadFile(dstPath)
 		if err != nil {
 			answerError(http.StatusNotFound, "Cannot read the converted file: %s", outFormat, err.Error())
 			return
@@ -221,6 +223,10 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 		response.AddHeader("Content-Type", allowedFormats[outFormat])
 		response.AddHeader("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
 			utils.ReplaceUnsupported(convName)), "+", "%20", -1))
+		outFileNfo, err := os.Stat(dstPath)
+		if err == nil {
+			response.AddHeader("Content-length", fmt.Sprintf("%d", outFileNfo.Size()))
+		}
 
 		response.Write(fileBytes)
 	}
