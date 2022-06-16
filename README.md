@@ -28,5 +28,9 @@ Database.LogLevel=Info
 
 Server.Listen=:8000
 
+# the place where the books archives are located
 Data.Dir=
+
+# path to the fb2c converter executable
+Fb2C.Path=
 ```
