@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/emicklei/go-restful"
 	"github.com/jinzhu/copier"
@@ -157,6 +158,19 @@ func (service RestService) getBooksByLibID(request *restful.Request, response *r
 	}
 }
 
+const maxIPadFileName = 45
+
+func getBookName(request *restful.Request, book *orm.Book) string {
+	outName := book.GetFullFilename()
+	userAgent := request.HeaderParameter("User-Agent")
+
+	if strings.Contains(userAgent, "iPad") && utf8.RuneCountInString(outName) > maxIPadFileName {
+		runes := []rune(outName)
+		outName = string(runes[0:maxIPadFileName-3]) + ".fb2"
+	}
+	return outName
+}
+
 func (service RestService) downloadBook(request *restful.Request, response *restful.Response) {
 	answerError := func(status int, reason string, params ...any) {
 		response.AddHeader("Content-Type", "text/plain")
@@ -174,7 +188,7 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 		answerError(http.StatusNotFound, "Book hasn't been found")
 		return
 	}
-	outName := result.GetFullFilename()
+	outName := getBookName(request, result)
 	extBook := &models.Book{}
 	copier.Copy(extBook, result)
 
