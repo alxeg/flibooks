@@ -158,7 +158,7 @@ func (service RestService) getBooksByLibID(request *restful.Request, response *r
 	}
 }
 
-const maxIPadFileName = 45
+const maxIPadFileName = 41
 
 func getBookName(request *restful.Request, book *orm.Book) string {
 	outName := book.GetFullFilename()
