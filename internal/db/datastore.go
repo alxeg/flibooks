@@ -215,7 +215,7 @@ func NewDBStore(dbType, connect, logLevel string) (DataStorer, error) {
 		dialector = mysql.Open(connect)
 	case "sqlite":
 		dialector = sqlite.Open(connect)
-	case "posrgres":
+	case "postgres":
 		dialector = postgres.Open(connect)
 	default:
 		return nil, errors.New("unknown dbType")
