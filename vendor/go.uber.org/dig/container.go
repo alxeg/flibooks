@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"reflect"
 
+	"go.uber.org/dig/internal/digclock"
 	"go.uber.org/dig/internal/dot"
 )
 
@@ -53,8 +54,7 @@ func (k key) String() string {
 	return k.t.String()
 }
 
-// Option configures a Container. It's included for future functionality;
-// currently, there are no concrete implementations.
+// Option configures a Container.
 type Option interface {
 	applyOption(*Container)
 }
@@ -126,13 +126,13 @@ type containerStore interface {
 	// type across all the Scopes that are in effect of this containerStore.
 	getAllValueProviders(name string, t reflect.Type) []provider
 
-	// Returns the decorators that can produce values for the given name and
+	// Returns the decorator that can decorate values for the given name and
 	// type.
-	getValueDecorators(name string, t reflect.Type) []decorator
+	getValueDecorator(name string, t reflect.Type) (decorator, bool)
 
-	// Reutrns the decorators that can produce values for the given group and
+	// Reutrns the decorator that can decorate values for the given group and
 	// type.
-	getGroupDecorators(name string, t reflect.Type) []decorator
+	getGroupDecorator(name string, t reflect.Type) (decorator, bool)
 
 	// Reports a list of stores (starting at this store) up to the root
 	// store.
@@ -142,6 +142,9 @@ type containerStore interface {
 
 	// Returns invokerFn function to use when calling arguments.
 	invoker() invokerFn
+
+	// Returns a clock to use
+	clock() digclock.Clock
 }
 
 // New constructs a Container.
@@ -176,6 +179,25 @@ func (deferAcyclicVerificationOption) applyOption(c *Container) {
 	c.scope.deferAcyclicVerification = true
 }
 
+// RecoverFromPanics is an [Option] to recover from panics that occur while
+// running functions given to the container. When set, recovered panics
+// will be placed into a [PanicError], and returned at the invoke callsite.
+// See [PanicError] for an example on how to handle panics with this option
+// enabled, and distinguish them from errors.
+func RecoverFromPanics() Option {
+	return recoverFromPanicsOption{}
+}
+
+type recoverFromPanicsOption struct{}
+
+func (recoverFromPanicsOption) String() string {
+	return "RecoverFromPanics()"
+}
+
+func (recoverFromPanicsOption) applyOption(c *Container) {
+	c.scope.recoverFromPanics = true
+}
+
 // Changes the source of randomness for the container.
 //
 // This will help provide determinism during tests.
@@ -191,6 +213,21 @@ func (o setRandOption) String() string {
 
 func (o setRandOption) applyOption(c *Container) {
 	c.scope.rand = o.r
+}
+
+// Changes the source of time for the container.
+func setClock(c digclock.Clock) Option {
+	return setClockOption{c: c}
+}
+
+type setClockOption struct{ c digclock.Clock }
+
+func (o setClockOption) String() string {
+	return fmt.Sprintf("setClock(%v)", o.c)
+}
+
+func (o setClockOption) applyOption(c *Container) {
+	c.scope.clockSrc = o.c
 }
 
 // DryRun is an Option which, when set to true, disables invocation of functions supplied to

@@ -37,7 +37,10 @@ func (*OnStopExecuting) event()   {}
 func (*OnStopExecuted) event()    {}
 func (*Supplied) event()          {}
 func (*Provided) event()          {}
+func (*Replaced) event()          {}
 func (*Decorated) event()         {}
+func (*BeforeRun) event()         {}
+func (*Run) event()               {}
 func (*Invoking) event()          {}
 func (*Invoked) event()           {}
 func (*Stopping) event()          {}
@@ -47,7 +50,7 @@ func (*RolledBack) event()        {}
 func (*Started) event()           {}
 func (*LoggerInitialized) event() {}
 
-// OnStartExecuting is emitted before an OnStart hook is exeucted.
+// OnStartExecuting is emitted before an OnStart hook is executed.
 type OnStartExecuting struct {
 	// FunctionName is the name of the function that will be executed.
 	FunctionName string
@@ -77,7 +80,7 @@ type OnStartExecuted struct {
 	Err error
 }
 
-// OnStopExecuting is emitted before an OnStop hook is exeucted.
+// OnStopExecuting is emitted before an OnStop hook is executed.
 type OnStopExecuting struct {
 	// FunctionName is the name of the function that will be executed.
 	FunctionName string
@@ -108,6 +111,12 @@ type Supplied struct {
 	// TypeName is the name of the type of value that was added.
 	TypeName string
 
+	// StackTrace is the stack trace of the call to Supply.
+	StackTrace []string
+
+	// ModuleTrace contains the module locations through which this value was added.
+	ModuleTrace []string
+
 	// ModuleName is the name of the module in which the value was added to.
 	ModuleName string
 
@@ -121,6 +130,12 @@ type Provided struct {
 	// Fx.
 	ConstructorName string
 
+	// StackTrace is the stack trace of where the constructor was provided to Fx.
+	StackTrace []string
+
+	// ModuleTrace contains the module locations through which this was provided to Fx.
+	ModuleTrace []string
+
 	// OutputTypeNames is a list of names of types that are produced by
 	// this constructor.
 	OutputTypeNames []string
@@ -131,13 +146,40 @@ type Provided struct {
 
 	// Err is non-nil if we failed to provide this constructor.
 	Err error
+
+	// Private denotes whether the provided constructor is a [Private] constructor.
+	Private bool
 }
 
-// Decorated is emitted when a decorator is provided to Fx.
+// Replaced is emitted when a value replaces a type in Fx.
+type Replaced struct {
+	// OutputTypeNames is a list of names of types that were replaced.
+	OutputTypeNames []string
+
+	// StackTrace is the stack trace of the call to Replace.
+	StackTrace []string
+
+	// ModuleTrace contains the module locations through which this value was added.
+	ModuleTrace []string
+
+	// ModuleName is the name of the module in which the value was added to.
+	ModuleName string
+
+	// Err is non-nil if we failed to supply the value.
+	Err error
+}
+
+// Decorated is emitted when a decorator is executed in Fx.
 type Decorated struct {
 	// DecoratorName is the name of the decorator function that was
 	// provided to Fx.
 	DecoratorName string
+
+	// StackTrace is the stack trace of where the decorator was given to Fx.
+	StackTrace []string
+
+	// ModuleTrace contains the module locations through which this value was added.
+	ModuleTrace []string
 
 	// ModuleName is the name of the module in which the value was added to.
 	ModuleName string
@@ -146,7 +188,41 @@ type Decorated struct {
 	// this decorator.
 	OutputTypeNames []string
 
-	// Err is non-nil if we failed to provide this decorator.
+	// Err is non-nil if we failed to run this decorator.
+	Err error
+}
+
+// BeforeRun is emitted before a constructor, decorator, or supply/replace stub is run by Fx.
+// When complete, a Run will be emitted.
+type BeforeRun struct {
+	// Name is the name of the function that will be run.
+	Name string
+
+	// Kind indicates which Fx option was used to pass along the function.
+	// It is either "provide", "decorate", "supply", or "replace".
+	Kind string
+
+	// ModuleName is the name of the module in which the function belongs.
+	ModuleName string
+}
+
+// Run is emitted after a constructor, decorator, or supply/replace stub is run by Fx.
+type Run struct {
+	// Name is the name of the function that was run.
+	Name string
+
+	// Kind indicates which Fx option was used to pass along the function.
+	// It is either "provide", "decorate", "supply", or "replace".
+	Kind string
+
+	// ModuleName is the name of the module in which the function belongs.
+	ModuleName string
+
+	// Runtime specifies how long it took to run this function.
+	Runtime time.Duration
+
+	// Err is non-nil if the function returned an error.
+	// If fx.RecoverFromPanics is used, this will include panics.
 	Err error
 }
 
@@ -160,7 +236,7 @@ type Invoking struct {
 }
 
 // Invoked is emitted after we invoke a function specified with fx.Invoke,
-// whether it succeded or failed.
+// whether it succeeded or failed.
 type Invoked struct {
 	// Functionname is the name of the function that was invoked.
 	FunctionName string
@@ -206,7 +282,7 @@ type RollingBack struct {
 }
 
 // RolledBack is emitted after a service has been rolled back, whether it
-// succeded or not.
+// succeeded or not.
 type RolledBack struct {
 	// Err is non-nil if the rollback failed.
 	Err error

@@ -28,9 +28,18 @@ import (
 	"go.uber.org/dig/internal/dot"
 )
 
+type decoratorState int
+
+const (
+	decoratorReady decoratorState = iota
+	decoratorOnStack
+	decoratorCalled
+)
+
 type decorator interface {
 	Call(c containerStore) error
 	ID() dot.CtorID
+	State() decoratorState
 }
 
 type decoratorNode struct {
@@ -42,8 +51,8 @@ type decoratorNode struct {
 	// Location where this function was defined.
 	location *digreflect.Func
 
-	// Whether the decorator owned by this node was already called.
-	called bool
+	// Current state of this decorator
+	state decoratorState
 
 	// Parameters of the decorator.
 	params paramList
@@ -51,14 +60,20 @@ type decoratorNode struct {
 	// Results of the decorator.
 	results resultList
 
-	// order of this node in each Scopes' graphHolders.
+	// Order of this node in each Scopes' graphHolders.
 	orders map[*Scope]int
 
-	// scope this node was originally provided to.
+	// Scope this node was originally provided to.
 	s *Scope
+
+	// Callback for this decorator, if there is one.
+	callback Callback
+
+	// BeforeCallback for this decorator, if there is one
+	beforeCallback BeforeCallback
 }
 
-func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
+func newDecoratorNode(dcor interface{}, s *Scope, opts decorateOptions) (*decoratorNode, error) {
 	dval := reflect.ValueOf(dcor)
 	dtype := dval.Type()
 	dptr := dval.Pointer()
@@ -74,22 +89,26 @@ func newDecoratorNode(dcor interface{}, s *Scope) (*decoratorNode, error) {
 	}
 
 	n := &decoratorNode{
-		dcor:     dcor,
-		dtype:    dtype,
-		id:       dot.CtorID(dptr),
-		location: digreflect.InspectFunc(dcor),
-		orders:   make(map[*Scope]int),
-		params:   pl,
-		results:  rl,
-		s:        s,
+		dcor:           dcor,
+		dtype:          dtype,
+		id:             dot.CtorID(dptr),
+		location:       digreflect.InspectFunc(dcor),
+		orders:         make(map[*Scope]int),
+		params:         pl,
+		results:        rl,
+		s:              s,
+		callback:       opts.Callback,
+		beforeCallback: opts.BeforeCallback,
 	}
 	return n, nil
 }
 
-func (n *decoratorNode) Call(s containerStore) error {
-	if n.called {
+func (n *decoratorNode) Call(s containerStore) (err error) {
+	if n.state == decoratorCalled {
 		return nil
 	}
+
+	n.state = decoratorOnStack
 
 	if err := shallowCheckDependencies(s, n.params); err != nil {
 		return errMissingDependencies{
@@ -98,23 +117,53 @@ func (n *decoratorNode) Call(s containerStore) error {
 		}
 	}
 
-	args, err := n.params.BuildList(n.s, s == n.s /* decorating */)
+	args, err := n.params.BuildList(n.s)
 	if err != nil {
 		return errArgumentsFailed{
 			Func:   n.location,
 			Reason: err,
 		}
 	}
+	if n.beforeCallback != nil {
+		n.beforeCallback(BeforeCallbackInfo{
+			Name: fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+		})
+	}
 
-	results := reflect.ValueOf(n.dcor).Call(args)
-	if err := n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
+	if n.callback != nil {
+		start := s.clock().Now()
+		// Wrap in separate func to include PanicErrors
+		defer func() {
+			n.callback(CallbackInfo{
+				Name:    fmt.Sprintf("%v.%v", n.location.Package, n.location.Name),
+				Error:   err,
+				Runtime: s.clock().Since(start),
+			})
+		}()
+	}
+
+	if n.s.recoverFromPanics {
+		defer func() {
+			if p := recover(); p != nil {
+				err = PanicError{
+					fn:    n.location,
+					Panic: p,
+				}
+			}
+		}()
+	}
+
+	results := s.invoker()(reflect.ValueOf(n.dcor), args)
+	if err = n.results.ExtractList(n.s, true /* decorated */, results); err != nil {
 		return err
 	}
-	n.called = true
+	n.state = decoratorCalled
 	return nil
 }
 
 func (n *decoratorNode) ID() dot.CtorID { return n.id }
+
+func (n *decoratorNode) State() decoratorState { return n.state }
 
 // DecorateOption modifies the default behavior of Decorate.
 type DecorateOption interface {
@@ -122,7 +171,9 @@ type DecorateOption interface {
 }
 
 type decorateOptions struct {
-	Info *DecorateInfo
+	Info           *DecorateInfo
+	Callback       Callback
+	BeforeCallback BeforeCallback
 }
 
 // FillDecorateInfo is a DecorateOption that writes info on what Dig was
@@ -163,29 +214,32 @@ func (c *Container) Decorate(decorator interface{}, opts ...DecorateOption) erro
 // Scope, or completely replace it with a new object.
 //
 // For example,
-//  s.Decorate(func(log *zap.Logger) *zap.Logger {
-//    return log.Named("myapp")
-//  })
+//
+//	s.Decorate(func(log *zap.Logger) *zap.Logger {
+//	  return log.Named("myapp")
+//	})
 //
 // This takes in a value, augments it with a name, and returns a replacement for it. Functions
 // in the Scope's dependency graph that use *zap.Logger will now use the *zap.Logger
 // returned by this decorator.
 //
 // A decorator can also take in multiple parameters and replace one of them:
-//  s.Decorate(func(log *zap.Logger, cfg *Config) *zap.Logger {
-//    return log.Named(cfg.Name)
-//  })
+//
+//	s.Decorate(func(log *zap.Logger, cfg *Config) *zap.Logger {
+//	  return log.Named(cfg.Name)
+//	})
 //
 // Or replace a subset of them:
-//  s.Decorate(func(
-//    log *zap.Logger,
-//    cfg *Config,
-//    scope metrics.Scope
-//  ) (*zap.Logger, metrics.Scope) {
-//    log = log.Named(cfg.Name)
-//    scope = scope.With(metrics.Tag("service", cfg.Name))
-//    return log, scope
-//  })
+//
+//	s.Decorate(func(
+//	  log *zap.Logger,
+//	  cfg *Config,
+//	  scope metrics.Scope
+//	) (*zap.Logger, metrics.Scope) {
+//	  log = log.Named(cfg.Name)
+//	  scope = scope.With(metrics.Tag("service", cfg.Name))
+//	  return log, scope
+//	})
 //
 // Decorating a Scope affects all the child scopes of this Scope.
 //
@@ -196,20 +250,21 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 		opt.apply(&options)
 	}
 
-	dn, err := newDecoratorNode(decorator, s)
+	dn, err := newDecoratorNode(decorator, s, options)
 	if err != nil {
 		return err
 	}
 
-	keys := findResultKeys(dn.results)
+	keys, err := findResultKeys(dn.results)
+	if err != nil {
+		return err
+	}
 	for _, k := range keys {
-		if len(s.decorators[k]) > 0 {
-			return fmt.Errorf("cannot decorate using function %v: %s already decorated",
-				dn.dtype,
-				k,
-			)
+		if _, ok := s.decorators[k]; ok {
+			return newErrInvalidInput(
+				fmt.Sprintf("cannot decorate using function %v: %s already decorated", dn.dtype, k), nil)
 		}
-		s.decorators[k] = append(s.decorators[k], dn)
+		s.decorators[k] = dn
 	}
 
 	if info := options.Info; info != nil {
@@ -238,7 +293,7 @@ func (s *Scope) Decorate(decorator interface{}, opts ...DecorateOption) error {
 	return nil
 }
 
-func findResultKeys(r resultList) []key {
+func findResultKeys(r resultList) ([]key, error) {
 	// use BFS to search for all keys included in a resultList.
 	var (
 		q    []result
@@ -254,6 +309,9 @@ func findResultKeys(r resultList) []key {
 		case resultSingle:
 			keys = append(keys, key{t: innerResult.Type, name: innerResult.Name})
 		case resultGrouped:
+			if innerResult.Type.Kind() != reflect.Slice {
+				return nil, newErrInvalidInput("decorating a value group requires decorating the entire value group, not a single value", nil)
+			}
 			keys = append(keys, key{t: innerResult.Type.Elem(), group: innerResult.Group})
 		case resultObject:
 			for _, f := range innerResult.Fields {
@@ -263,5 +321,5 @@ func findResultKeys(r resultList) []key {
 			q = append(q, innerResult.Results...)
 		}
 	}
-	return keys
+	return keys, nil
 }

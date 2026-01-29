@@ -22,7 +22,6 @@ package dig
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -38,23 +37,21 @@ type ProvideOption interface {
 }
 
 type provideOptions struct {
-	Name     string
-	Group    string
-	Info     *ProvideInfo
-	As       []interface{}
-	Location *digreflect.Func
-	Exported bool
+	Name           string
+	Group          string
+	Info           *ProvideInfo
+	As             []interface{}
+	Location       *digreflect.Func
+	Exported       bool
+	Callback       Callback
+	BeforeCallback BeforeCallback
 }
 
 func (o *provideOptions) Validate() error {
 	if len(o.Group) > 0 {
 		if len(o.Name) > 0 {
-			return fmt.Errorf(
-				"cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group)
-		}
-		if len(o.As) > 0 {
-			return fmt.Errorf(
-				"cannot use dig.As with value groups: dig.As provided with group:%q", o.Group)
+			return newErrInvalidInput(
+				fmt.Sprintf("cannot use named values with value groups: name:%q provided with group:%q", o.Name, o.Group), nil)
 		}
 	}
 
@@ -63,26 +60,30 @@ func (o *provideOptions) Validate() error {
 	// https://golang.org/ref/spec#raw_string_lit is that they cannot contain
 	// backquotes.
 	if strings.ContainsRune(o.Name, '`') {
-		return errf("invalid dig.Name(%q): names cannot contain backquotes", o.Name)
+		return newErrInvalidInput(
+			fmt.Sprintf("invalid dig.Name(%q): names cannot contain backquotes", o.Name), nil)
 	}
 	if strings.ContainsRune(o.Group, '`') {
-		return errf("invalid dig.Group(%q): group names cannot contain backquotes", o.Group)
+		return newErrInvalidInput(
+			fmt.Sprintf("invalid dig.Group(%q): group names cannot contain backquotes", o.Group), nil)
 	}
 
 	for _, i := range o.As {
 		t := reflect.TypeOf(i)
 
 		if t == nil {
-			return fmt.Errorf("invalid dig.As(nil): argument must be a pointer to an interface")
+			return newErrInvalidInput("invalid dig.As(nil): argument must be a pointer to an interface", nil)
 		}
 
 		if t.Kind() != reflect.Ptr {
-			return fmt.Errorf("invalid dig.As(%v): argument must be a pointer to an interface", t)
+			return newErrInvalidInput(
+				fmt.Sprintf("invalid dig.As(%v): argument must be a pointer to an interface", t), nil)
 		}
 
 		pointingTo := t.Elem()
 		if pointingTo.Kind() != reflect.Interface {
-			return fmt.Errorf("invalid dig.As(*%v): argument must be a pointer to an interface", pointingTo)
+			return newErrInvalidInput(
+				fmt.Sprintf("invalid dig.As(*%v): argument must be a pointer to an interface", pointingTo), nil)
 		}
 	}
 	return nil
@@ -94,14 +95,14 @@ func (o *provideOptions) Validate() error {
 //
 // Given,
 //
-//   func NewReadOnlyConnection(...) (*Connection, error)
-//   func NewReadWriteConnection(...) (*Connection, error)
+//	func NewReadOnlyConnection(...) (*Connection, error)
+//	func NewReadWriteConnection(...) (*Connection, error)
 //
 // The following will provide two connections to the container: one under the
 // name "ro" and the other under the name "rw".
 //
-//   c.Provide(NewReadOnlyConnection, dig.Name("ro"))
-//   c.Provide(NewReadWriteConnection, dig.Name("rw"))
+//	c.Provide(NewReadOnlyConnection, dig.Name("ro"))
+//	c.Provide(NewReadWriteConnection, dig.Name("rw"))
 //
 // This option cannot be provided for constructors which produce result
 // objects.
@@ -227,34 +228,34 @@ func (o fillProvideInfoOption) applyProvideOption(opts *provideOptions) {
 // For example, the following will make io.Reader and io.Writer available
 // in the container, but not buffer.
 //
-//   c.Provide(newBuffer, dig.As(new(io.Reader), new(io.Writer)))
+//	c.Provide(newBuffer, dig.As(new(io.Reader), new(io.Writer)))
 //
 // That is, the above is equivalent to the following.
 //
-//   c.Provide(func(...) (io.Reader, io.Writer) {
-//     b := newBuffer(...)
-//     return b, b
-//   })
+//	c.Provide(func(...) (io.Reader, io.Writer) {
+//	  b := newBuffer(...)
+//	  return b, b
+//	})
 //
 // If used with dig.Name, the type produced by the constructor and the types
 // specified with dig.As will all use the same name. For example,
 //
-//   c.Provide(newFile, dig.As(new(io.Reader)), dig.Name("temp"))
+//	c.Provide(newFile, dig.As(new(io.Reader)), dig.Name("temp"))
 //
 // The above is equivalent to the following.
 //
-//   type Result struct {
-//     dig.Out
+//	type Result struct {
+//	  dig.Out
 //
-//     Reader io.Reader `name:"temp"`
-//   }
+//	  Reader io.Reader `name:"temp"`
+//	}
 //
-//   c.Provide(func(...) Result {
-//     f := newFile(...)
-//     return Result{
-//       Reader: f,
-//     }
-//   })
+//	c.Provide(func(...) Result {
+//	  f := newFile(...)
+//	  return Result{
+//	    Reader: f,
+//	  }
+//	})
 //
 // This option cannot be provided for constructors which produce result
 // objects.
@@ -307,15 +308,18 @@ func (o provideLocationOption) applyProvideOption(opts *provideOptions) {
 // of which Scope it was provided from. By default, it is false.
 //
 // For example,
-//  c := New()
-//  s1 := c.Scope("child 1")
-//  s2:= c.Scope("child 2")
-//  s1.Provide(func() *bytes.Buffer { ... })
+//
+//	c := New()
+//	s1 := c.Scope("child 1")
+//	s2:= c.Scope("child 2")
+//	s1.Provide(func() *bytes.Buffer { ... })
+//
 // does not allow the constructor returning *bytes.Buffer to be made available to
 // the root Container c or its sibling Scope s2.
 //
 // With Export, you can make this constructor available to all the Scopes:
-//  s1.Provide(func() *bytes.Buffer { ... }, Export(true))
+//
+//	s1.Provide(func() *bytes.Buffer { ... }, Export(true))
 func Export(export bool) ProvideOption {
 	return provideExportOption{exported: export}
 }
@@ -402,10 +406,11 @@ func (c *Container) Provide(constructor interface{}, opts ...ProvideOption) erro
 func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 	ctype := reflect.TypeOf(constructor)
 	if ctype == nil {
-		return errors.New("can't provide an untyped nil")
+		return newErrInvalidInput("can't provide an untyped nil", nil)
 	}
 	if ctype.Kind() != reflect.Func {
-		return errf("must provide constructor function, got %v (type %v)", constructor, ctype)
+		return newErrInvalidInput(
+			fmt.Sprintf("must provide constructor function, got %v (type %v)", constructor, ctype), nil)
 	}
 
 	var options provideOptions
@@ -417,8 +422,15 @@ func (s *Scope) Provide(constructor interface{}, opts ...ProvideOption) error {
 	}
 
 	if err := s.provide(constructor, options); err != nil {
+		var errFunc *digreflect.Func
+		if options.Location == nil {
+			errFunc = digreflect.InspectFunc(constructor)
+		} else {
+			errFunc = options.Location
+		}
+
 		return errProvide{
-			Func:   digreflect.InspectFunc(constructor),
+			Func:   errFunc,
 			Reason: err,
 		}
 	}
@@ -438,14 +450,17 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 	// we start making changes to it as we may need to
 	// undo them upon encountering errors.
 	allScopes := s.appendSubscopes(nil)
-	for _, s := range allScopes {
-		s := s
-		s.gh.Snapshot()
-		defer func() {
-			if err != nil {
-				s.gh.Rollback()
+
+	defer func(allSc []*Scope) {
+		if err != nil {
+			for _, sc := range allSc {
+				sc.gh.Rollback()
 			}
-		}()
+		}
+	}(allScopes)
+
+	for _, sc := range allScopes {
+		sc.gh.Snapshot()
 	}
 
 	n, err := newConstructorNode(
@@ -453,10 +468,12 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 		s,
 		origScope,
 		constructorOptions{
-			ResultName:  opts.Name,
-			ResultGroup: opts.Group,
-			ResultAs:    opts.As,
-			Location:    opts.Location,
+			ResultName:     opts.Name,
+			ResultGroup:    opts.Group,
+			ResultAs:       opts.As,
+			Location:       opts.Location,
+			Callback:       opts.Callback,
+			BeforeCallback: opts.BeforeCallback,
 		},
 	)
 	if err != nil {
@@ -470,7 +487,8 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 
 	ctype := reflect.TypeOf(ctor)
 	if len(keys) == 0 {
-		return errf("%v must provide at least one non-error type", ctype)
+		return newErrInvalidInput(
+			fmt.Sprintf("%v must provide at least one non-error type", ctype), nil)
 	}
 
 	oldProviders := make(map[key][]*constructorNode)
@@ -493,7 +511,7 @@ func (s *Scope) provide(ctor interface{}, opts provideOptions) (err error) {
 				s.providers[k] = ops
 			}
 
-			return errf("this function introduces a cycle", s.cycleDetectedError(cycle))
+			return newErrInvalidInput("this function introduces a cycle", s.cycleDetectedError(cycle))
 		}
 		s.isVerifiedAcyclic = true
 	}
@@ -624,6 +642,10 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 		// value there.
 		k := key{group: r.Group, t: r.Type}
 		cv.keyPaths[k] = path
+		for _, asType := range r.As {
+			k := key{group: r.Group, t: asType}
+			cv.keyPaths[k] = path
+		}
 	}
 
 	return cv
@@ -632,10 +654,8 @@ func (cv connectionVisitor) Visit(res result) resultVisitor {
 func (cv connectionVisitor) checkKey(k key, path string) error {
 	defer func() { cv.keyPaths[k] = path }()
 	if conflict, ok := cv.keyPaths[k]; ok {
-		return errf(
-			"cannot provide %v from %v", k, path,
-			"already provided by %v", conflict,
-		)
+		return newErrInvalidInput(fmt.Sprintf("cannot provide %v from %v", k, path),
+			newErrInvalidInput(fmt.Sprintf("already provided by %v", conflict), nil))
 	}
 	if ps := cv.s.providers[k]; len(ps) > 0 {
 		cons := make([]string, len(ps))
@@ -643,10 +663,8 @@ func (cv connectionVisitor) checkKey(k key, path string) error {
 			cons[i] = fmt.Sprint(p.Location())
 		}
 
-		return errf(
-			"cannot provide %v from %v", k, path,
-			"already provided by %v", strings.Join(cons, "; "),
-		)
+		return newErrInvalidInput(fmt.Sprintf("cannot provide %v from %v", k, path),
+			newErrInvalidInput(fmt.Sprintf("already provided by %v", strings.Join(cons, "; ")), nil))
 	}
 	return nil
 }

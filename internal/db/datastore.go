@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -214,6 +215,8 @@ func NewDBStore(dbType, connect, logLevel string) (DataStorer, error) {
 		dialector = mysql.Open(connect)
 	case "sqlite":
 		dialector = sqlite.Open(connect)
+	case "posrgres":
+		dialector = postgres.Open(connect)
 	default:
 		return nil, errors.New("unknown dbType")
 	}

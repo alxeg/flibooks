@@ -3,7 +3,6 @@ package api
 import (
 	"archive/zip"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -15,7 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/v3"
 	"github.com/jinzhu/copier"
 
 	"github.com/alxeg/flibooks/internal/db"
@@ -35,59 +34,73 @@ var (
 )
 
 type RestService struct {
-	listen    string
-	dataDir   string
-	dataStore db.DataStorer
-	container *restful.Container
-	converter convert.Converter
+	listen     string
+	dataDir    string
+	staticsDir string
+	dataStore  db.DataStorer
+	container  *restful.Container
+	converter  convert.Converter
+}
+
+func (service RestService) staticFromPathParam(req *restful.Request, resp *restful.Response) {
+	actual := path.Join(service.staticsDir, req.PathParameter("subpath"))
+	fmt.Printf("serving %s ... (from %s)\n", actual, req.PathParameter("subpath"))
+	http.ServeFile(
+		resp.ResponseWriter,
+		req.Request,
+		actual)
 }
 
 func (service RestService) registerBookResource(container *restful.Container) {
+
+	restful.DefaultContainer.Router(restful.CurlyRouter{})
+
 	ws := new(restful.WebService)
-	ws.
+
+	path := ws.
 		Path("/book").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
-	ws.Route(ws.GET("/{bookId}").
+	path.Route(ws.GET("/{bookId}").
 		To(service.getBook).
 		Doc("Get specific book info").
 		Operation("getBook").
 		Param(ws.PathParameter("bookId", "identifier of the book").DataType("int")).
 		Returns(200, "OK", orm.Book{}))
 
-	ws.Route(ws.GET("/langs").
+	path.Route(ws.GET("/langs").
 		To(service.getLangs).
 		Doc("Get all available books languages").
 		Operation("getLangs").
 		Returns(200, "OK", []string{"en"}))
 
-	ws.Route(ws.GET("/{bookId}/download").
+	path.Route(ws.GET("/{bookId}/download").
 		To(service.downloadBook).
 		Doc("Download book content").
 		Operation("downloadBook").
 		Param(ws.PathParameter("bookId", "identifier of the book").DataType("int")).
 		Returns(200, "OK", orm.Book{}))
 
-	ws.Route(ws.GET("/archive").
+	path.Route(ws.GET("/archive").
 		To(service.downloadBooksArchive).
 		Doc("Download books in single zip file").
 		Operation("downloadBooksArchive").
 		Returns(200, "OK", orm.Book{}))
 
-	ws.Route(ws.POST("/search").
+	path.Route(ws.POST("/search").
 		To(service.searchBooks).
 		Doc("Search for the books").
 		Operation("searchBooks").
 		Returns(200, "OK", []orm.Book{}))
 
-	ws.Route(ws.POST("/series").
+	path.Route(ws.POST("/series").
 		To(service.searchSeries).
 		Doc("Search for the books").
 		Operation("searchBooks").
 		Returns(200, "OK", []orm.Book{}))
 
-	ws.Route(ws.GET("/lib/{libId}").
+	path.Route(ws.GET("/lib/{libId}").
 		To(service.getBooksByLibID).
 		Doc("Get books by libId").
 		Operation("getBooksByLibId").
@@ -99,33 +112,33 @@ func (service RestService) registerBookResource(container *restful.Container) {
 
 func (service RestService) registerAuthorResource(container *restful.Container) {
 	ws := new(restful.WebService)
-	ws.
+	path := ws.
 		Path("/author").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
-	ws.Route(ws.GET("/{authorId}").
+	path.Route(ws.GET("/{authorId}").
 		To(service.getAuthor).
 		Doc("Get author's info").
 		Operation("getAuthor").
 		Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
 		Returns(200, "OK", orm.Author{}))
 
-	ws.Route(ws.GET("/{authorId}/books").
+	path.Route(ws.GET("/{authorId}/books").
 		To(service.listAuthorsBooks).
 		Doc("Show author's books").
 		Operation("listAuthorsBooks").
 		Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
 		Returns(200, "OK", []orm.Book{}))
 
-	ws.Route(ws.POST("/{authorId}/books").
+	path.Route(ws.POST("/{authorId}/books").
 		To(service.listAuthorsBooksPost).
 		Doc("Show author's books").
 		Operation("listAuthorsBooks").
 		Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
 		Returns(200, "OK", []orm.Book{}))
 
-	ws.Route(ws.POST("/search").
+	path.Route(ws.POST("/search").
 		To(service.searchAuthors).
 		Doc("Search authors").
 		Operation("searchAuthors").
@@ -204,7 +217,7 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 		}
 	} else {
 		convName := strings.TrimSuffix(outName, filepath.Ext(outName)) + "." + outFormat
-		tmpDir, _ := ioutil.TempDir("", "fliconvert")
+		tmpDir, _ := os.MkdirTemp("", "fliconvert")
 		defer os.RemoveAll(tmpDir)
 
 		srcPath := path.Join(tmpDir, "file.fb2")
@@ -228,7 +241,7 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 			return
 		}
 		dstPath := path.Join(tmpDir, "file."+outFormat)
-		fileBytes, err := ioutil.ReadFile(dstPath)
+		fileBytes, err := os.ReadFile(dstPath)
 		if err != nil {
 			answerError(http.StatusNotFound, "Cannot read the converted file: %s", outFormat, err.Error())
 			return
@@ -402,14 +415,23 @@ func (service RestService) StartListen() {
 	log.Fatal(server.ListenAndServe())
 }
 
-func NewRestService(listen string, dataStore db.DataStorer, dataDir string, converter convert.Converter) RestServer {
-	service := new(RestService)
-	service.listen = listen
-	service.dataStore = dataStore
-	service.dataDir = dataDir
-	service.container = restful.NewContainer()
+func NewRestService(listen string, dataStore db.DataStorer, dataDir string, converter convert.Converter, staticsDir, staticsRoute string) RestServer {
+	absStatic, _ := filepath.Abs(staticsDir)
+	service := RestService{
+		listen:     listen,
+		dataStore:  dataStore,
+		dataDir:    dataDir,
+		container:  restful.NewContainer(),
+		converter:  converter,
+		staticsDir: absStatic,
+	}
+
 	service.container.Router(restful.CurlyRouter{})
-	service.converter = converter
+
+	// static files
+	ws := new(restful.WebService)
+	ws.Path(staticsRoute).Route(ws.GET("/{subpath:*}").To(service.staticFromPathParam))
+	service.container.Add(ws)
 
 	service.registerBookResource(service.container)
 	service.registerAuthorResource(service.container)
