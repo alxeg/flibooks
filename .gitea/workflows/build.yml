@@ -40,6 +40,6 @@ jobs:
             ${{ secrets.HARBOR_REGISTRY_URL }}/lab/flibooks:latest
             ${{ secrets.HARBOR_REGISTRY_URL }}/lab/flibooks:${{ github.run_number }}
 
-      - name: Logout from Harbor Registry
+      - name: Registry logout
         if: always()
         run: docker logout ${{ secrets.HARBOR_REGISTRY_URL }}
