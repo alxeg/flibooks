@@ -1,0 +1,45 @@
+name: Build flibooks backend
+
+on:
+  push:
+    branches:
+      - master
+
+  workflow_dispatch:
+    inputs:
+      push_image:
+        description: 'Push image to repo'
+        type: boolean
+        required: true
+        default: false
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Registry login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.HARBOR_REGISTRY_URL }}
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Build and push (if enabled) Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event.inputs.push_image == 'true' }}
+          tags: |
+            ${{ secrets.HARBOR_REGISTRY_URL }}/lab/flibooks:latest
+            ${{ secrets.HARBOR_REGISTRY_URL }}/lab/flibooks:${{ github.run_number }}
+
+      - name: Logout from Harbor Registry
+        if: always()
+        run: docker logout ${{ secrets.HARBOR_REGISTRY_URL }}
