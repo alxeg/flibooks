@@ -114,7 +114,7 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 	if store.dbType != "postgres" {
 		search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
 	} else {
-		search.Preload("Container").Order("series, CAST(COALESCE((REGEX_MATCH(ser_no, '\\d+'))[1], '0') as integer), title").Find(&result)
+		search.Preload("Container").Order("series, CAST(COALESCE((REGEXP_MATCH(ser_no, '\\d+'))[1], '0') as integer), title").Find(&result)
 	}
 
 	return result, nil
@@ -173,7 +173,7 @@ func (store *dbStore) ListAuthorBooks(authorID uint, noDetails bool, params mode
 	if store.dbType != "postgres" {
 		search.Order("series, cast(ser_no as unsigned), title").Find(&result)
 	} else {
-		search.Order("series, CAST(COALESCE((REGEX_MATCH(ser_no, '\\d+'))[1], '0') as integer), title").Find(&result)
+		search.Order("series, CAST(COALESCE((REGEXP_MATCH(ser_no, '\\d+'))[1], '0') as integer), title").Find(&result)
 	}
 
 	return result, nil
