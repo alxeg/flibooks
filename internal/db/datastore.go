@@ -23,7 +23,7 @@ type dbStore struct {
 
 func addParams(search *gorm.DB, params models.Search) *gorm.DB {
 	if !params.Deleted {
-		search = search.Where("del = 0")
+		search = search.Where("del = '0'")
 	}
 
 	if len(params.Langs) > 0 {
