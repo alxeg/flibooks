@@ -18,7 +18,8 @@ import (
 )
 
 type dbStore struct {
-	db *gorm.DB
+	dbType string
+	db     *gorm.DB
 }
 
 func addParams(search *gorm.DB, params models.Search) *gorm.DB {
@@ -110,7 +111,11 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 	if limit > 0 {
 		search = search.Limit(limit)
 	}
-	search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
+	if store.dbType != "postgres" {
+		search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
+	} else {
+		search.Preload("Container").Order("series, CAST(COALESCE((REGEX_MATCH(ser_no, '\\d+'))[1], '0') as integer), title").Find(&result)
+	}
 
 	return result, nil
 }
@@ -164,7 +169,13 @@ func (store *dbStore) ListAuthorBooks(authorID uint, noDetails bool, params mode
 	if !noDetails {
 		search = search.Preload("Authors")
 	}
-	search.Order("series, cast(ser_no as unsigned), title").Find(&result)
+
+	if store.dbType != "postgres" {
+		search.Order("series, cast(ser_no as unsigned), title").Find(&result)
+	} else {
+		search.Order("series, CAST(COALESCE((REGEX_MATCH(ser_no, '\\d+'))[1], '0') as integer), title").Find(&result)
+	}
+
 	return result, nil
 }
 
@@ -246,6 +257,7 @@ func NewDBStore(dbType, connect, logLevel string) (DataStorer, error) {
 		// db.LogMode(true)
 	}
 	result := new(dbStore)
+	result.dbType = dbType
 	result.db = db
 
 	return result, err
