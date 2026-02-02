@@ -43,6 +43,7 @@ func (c *converter) Convert(src, dst, format string) error {
 
 	command := cmd.NewCmdOptions(cmdOptions, c.AppConfig.Fb2C.Path, "convert", "--nodirs", "--ow", "--to", format, src, dst)
 	runTimeStatus := command.Start()
+	log.Printf("Executing: %s %s %s %s %s %s %s %s\n", c.AppConfig.Fb2C.Path, "convert", "--nodirs", "--ow", "--to", format, src, dst)
 	go processOutput(command)
 
 	status := <-runTimeStatus

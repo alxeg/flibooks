@@ -192,7 +192,7 @@ func getBookName(request *restful.Request, book *orm.Book) string {
 func (service RestService) downloadBook(request *restful.Request, response *restful.Response) {
 	answerError := func(status int, reason string, params ...any) {
 		response.AddHeader("Content-Type", "text/plain")
-		errorStr := fmt.Sprint(reason+"\n", params)
+		errorStr := fmt.Sprintf(reason+"\n", params)
 		log.Println(errorStr)
 		response.WriteErrorString(status, errorStr)
 	}
