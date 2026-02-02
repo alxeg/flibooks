@@ -25,6 +25,7 @@ type Props struct {
 func NewApi(p Props) (RestServer, error) {
 	return NewRestService(
 		p.AppConfig.Server.Listen,
+		p.AppConfig.ApiPrefix,
 		p.DB,
 		p.AppConfig.Data.Dir,
 		p.Converter,

@@ -35,6 +35,7 @@ var (
 
 type RestService struct {
 	listen     string
+	apiPrefix  string
 	dataDir    string
 	staticsDir string
 	dataStore  db.DataStorer
@@ -58,7 +59,7 @@ func (service RestService) registerBookResource(container *restful.Container) {
 	ws := new(restful.WebService)
 
 	path := ws.
-		Path("/book").
+		Path(service.apiPrefix + "/book").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
@@ -113,7 +114,7 @@ func (service RestService) registerBookResource(container *restful.Container) {
 func (service RestService) registerAuthorResource(container *restful.Container) {
 	ws := new(restful.WebService)
 	path := ws.
-		Path("/author").
+		Path(service.apiPrefix + "/author").
 		Consumes(restful.MIME_JSON).
 		Produces(restful.MIME_JSON)
 
@@ -415,7 +416,7 @@ func (service RestService) StartListen() {
 	log.Fatal(server.ListenAndServe())
 }
 
-func NewRestService(listen string, dataStore db.DataStorer, dataDir string, converter convert.Converter, staticsDir, staticsRoute string) RestServer {
+func NewRestService(listen, apiPrefix string, dataStore db.DataStorer, dataDir string, converter convert.Converter, staticsDir, staticsRoute string) RestServer {
 	absStatic, _ := filepath.Abs(staticsDir)
 	service := RestService{
 		listen:     listen,

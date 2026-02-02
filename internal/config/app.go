@@ -41,6 +41,8 @@ type App struct {
 	Data     Data
 	Fb2C     Fb2C
 
+	ApiPrefix string
+
 	StaticsDir   string
 	StaticsRoute string
 }
