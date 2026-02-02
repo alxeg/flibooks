@@ -44,7 +44,11 @@ type RestService struct {
 }
 
 func (service RestService) staticFromPathParam(req *restful.Request, resp *restful.Response) {
-	actual := path.Join(service.staticsDir, req.PathParameter("subpath"))
+	subPath := req.PathParameter("subpath")
+	if subPath == "" {
+		subPath = "index.html"
+	}
+	actual := path.Join(service.staticsDir, subPath)
 	fmt.Printf("serving %s ... (from %s)\n", actual, req.PathParameter("subpath"))
 	http.ServeFile(
 		resp.ResponseWriter,
@@ -431,6 +435,7 @@ func NewRestService(listen, apiPrefix string, dataStore db.DataStorer, dataDir s
 
 	// static files
 	ws := new(restful.WebService)
+	ws.Path(staticsRoute).Route(ws.GET("/").To(service.staticFromPathParam))
 	ws.Path(staticsRoute).Route(ws.GET("/{subpath:*}").To(service.staticFromPathParam))
 	service.container.Add(ws)
 
