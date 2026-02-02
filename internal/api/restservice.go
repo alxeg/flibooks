@@ -426,6 +426,7 @@ func NewRestService(listen, apiPrefix string, dataStore db.DataStorer, dataDir s
 		listen:     listen,
 		dataStore:  dataStore,
 		dataDir:    dataDir,
+		apiPrefix:  apiPrefix,
 		container:  restful.NewContainer(),
 		converter:  converter,
 		staticsDir: absStatic,
