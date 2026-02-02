@@ -49,7 +49,7 @@ func (service RestService) staticFromPathParam(req *restful.Request, resp *restf
 		subPath = "index.html"
 	}
 	actual := path.Join(service.staticsDir, subPath)
-	fmt.Printf("serving %s ... (from %s)\n", actual, req.PathParameter("subpath"))
+
 	http.ServeFile(
 		resp.ResponseWriter,
 		req.Request,
