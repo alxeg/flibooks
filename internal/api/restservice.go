@@ -2,6 +2,7 @@ package api
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -49,6 +50,12 @@ func (service RestService) staticFromPathParam(req *restful.Request, resp *restf
 		subPath = "index.html"
 	}
 	actual := path.Join(service.staticsDir, subPath)
+
+	// act like nginx's try_files defaulting to index.html
+	fileInfo, err := os.Stat(actual)
+	if (err == nil && !fileInfo.Mode().IsRegular()) || errors.Is(err, os.ErrNotExist) {
+		actual = path.Join(service.staticsDir, "index.html")
+	}
 
 	http.ServeFile(
 		resp.ResponseWriter,
