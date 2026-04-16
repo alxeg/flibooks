@@ -112,9 +112,9 @@ func (store *dbStore) FindBooksSeries(params models.Search) ([]models.Book, erro
 		search = search.Limit(limit)
 	}
 	if store.dbType != "postgres" {
-		search.Preload("Container").Order("series, cast(ser_no as unsigned), title").Find(&result)
+		search.Preload("Container").Preload("Authors").Order("series, cast(ser_no as unsigned), title").Find(&result)
 	} else {
-		search.Preload("Container").Order("series, CAST(COALESCE((REGEXP_MATCH(ser_no, '\\d+'))[1], '0') as integer), title").Find(&result)
+		search.Preload("Container").Preload("Authors").Order("series, CAST(COALESCE((REGEXP_MATCH(ser_no, '\\d+'))[1], '0') as integer), title").Find(&result)
 	}
 
 	return result, nil
