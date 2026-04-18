@@ -371,7 +371,14 @@ func (service RestService) downloadBooksArchiveInternal(ids []string, format str
 }
 
 func (service RestService) addOriginalBookToArchive(zipWriter *zip.Writer, book *orm.Book, dataDir string) {
-	zipHeader := &zip.FileHeader{Name: book.GetFullFilename(), Method: zip.Deflate, Flags: 0x800}
+	zipHeader := &zip.FileHeader{
+		Name:     book.GetFullFilename(),
+		Method:   zip.Deflate,
+		Modified: time.Now(),
+		Flags:    0x800,
+	}
+	zipHeader.SetMode(0644)
+
 	entry, err := zipWriter.CreateHeader(zipHeader)
 	if err == nil {
 		extBook := &models.Book{}
@@ -428,7 +435,12 @@ func (service RestService) addConvertedBookToArchive(zipWriter *zip.Writer, book
 	outName := strings.TrimSuffix(book.GetFullFilename(), ext) + "." + format
 
 	// Write to zip
-	zipHeader := &zip.FileHeader{Name: outName, Method: zip.Deflate}
+	zipHeader := &zip.FileHeader{
+		Name:     outName,
+		Method:   zip.Deflate,
+		Modified: time.Now(),
+		Flags:    0x800,
+	}
 	zipHeader.SetMode(0644)
 	entry, err := zipWriter.CreateHeader(zipHeader)
 	if err != nil {
