@@ -98,6 +98,8 @@ func (service RestService) registerBookResource(container *restful.Container) {
 		To(service.downloadBooksArchive).
 		Doc("Download books in single zip file").
 		Operation("downloadBooksArchive").
+		Param(ws.QueryParameter("id", "comma-separated list of book id").DataType("string")).
+		Param(ws.QueryParameter("format", "convert books to format: epub, azw3, mobi").DataType("string")).
 		Returns(200, "OK", orm.Book{}))
 
 	path.Route(ws.POST("/search").
@@ -274,7 +276,18 @@ func (service RestService) downloadBook(request *restful.Request, response *rest
 func (service RestService) downloadBooksArchive(request *restful.Request, response *restful.Response) {
 	request.Request.ParseForm()
 	ids := request.Request.Form["id"]
+	format := request.QueryParameter("format")
+
 	if len(ids) > 0 {
+		// Validate format if provided
+		if format != "" {
+			if _, ok := allowedFormats[format]; !ok {
+				response.AddHeader("Content-Type", "text/plain")
+				response.WriteErrorString(http.StatusBadRequest, "Invalid format. Allowed formats: epub, azw3, mobi\n")
+				return
+			}
+		}
+
 		response.Header().Set("Content-Type", "application/zip")
 		response.Header().Set("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
 			"flibooks-"+time.Now().Format("2006-01-02T15-04-05")+".zip"), "+", "%20", -1))
@@ -290,16 +303,12 @@ func (service RestService) downloadBooksArchive(request *restful.Request, respon
 					bookID, _ := strconv.ParseUint(id, 0, 32)
 					book, err := service.dataStore.GetBook(uint(bookID))
 					if err == nil {
-						zipHeader := &zip.FileHeader{Name: book.GetFullFilename(), Method: zip.Deflate, Flags: 0x800}
-						entry, err := zipWriter.CreateHeader(zipHeader)
-						// entry, err := zipWriter.Create(book.GetFullFilename())
-
-						if err == nil {
-							extBook := &models.Book{}
-							copier.Copy(extBook, book)
-							inpx.UnzipBookToWriter(service.dataDir, extBook, entry)
+						if format != "" {
+							// Convert book to specified format
+							service.addConvertedBookToArchive(zipWriter, book, service.dataDir, format)
 						} else {
-							log.Println("Failed to compress ", book.GetFullFilename())
+							// Add original book to archive
+							service.addOriginalBookToArchive(zipWriter, book, service.dataDir)
 						}
 					} else {
 						log.Println("Failed to get book ", id)
@@ -319,6 +328,79 @@ func (service RestService) downloadBooksArchive(request *restful.Request, respon
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
 		response.WriteErrorString(http.StatusBadRequest, "No parameters passed\n")
+	}
+}
+
+func (service RestService) addOriginalBookToArchive(zipWriter *zip.Writer, book *orm.Book, dataDir string) {
+	zipHeader := &zip.FileHeader{Name: book.GetFullFilename(), Method: zip.Deflate, Flags: 0x800}
+	entry, err := zipWriter.CreateHeader(zipHeader)
+	if err == nil {
+		extBook := &models.Book{}
+		copier.Copy(extBook, book)
+		inpx.UnzipBookToWriter(dataDir, extBook, entry)
+	} else {
+		log.Println("Failed to compress ", book.GetFullFilename())
+	}
+}
+
+func (service RestService) addConvertedBookToArchive(zipWriter *zip.Writer, book *orm.Book, dataDir string, format string) {
+	// Create temp file for conversion
+	tmpDir, err := os.MkdirTemp("", "fliconvert")
+	if err != nil {
+		log.Println("Failed to create temp dir:", err)
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+
+	srcPath := path.Join(tmpDir, "file.fb2")
+	src, err := os.Create(srcPath)
+	if err != nil {
+		log.Println("Failed to create src file:", err)
+		return
+	}
+	defer src.Close()
+
+	// Write FB2 content to temp file
+	extBook := &models.Book{}
+	copier.Copy(extBook, book)
+	err = inpx.UnzipBookToWriter(dataDir, extBook, src)
+	if err != nil {
+		log.Println("Failed to write FB2 content:", err)
+		return
+	}
+
+	// Convert to target format
+	err = service.converter.Convert(srcPath, tmpDir, format)
+	if err != nil {
+		log.Printf("Failed to convert book %s to %s: %v\n", book.GetFullFilename(), format, err)
+		return
+	}
+
+	// Read converted file and add to archive
+	destPath := path.Join(tmpDir, "file."+format)
+	fileBytes, err := os.ReadFile(destPath)
+	if err != nil {
+		log.Println("Failed to read converted file:", err)
+		return
+	}
+
+	// Determine output filename with new extension
+	ext := filepath.Ext(book.GetFullFilename())
+	outName := strings.TrimSuffix(book.GetFullFilename(), ext) + "." + format
+
+	// Write to zip
+	zipHeader := &zip.FileHeader{Name: outName, Method: zip.Deflate}
+	zipHeader.SetMode(0644)
+	entry, err := zipWriter.CreateHeader(zipHeader)
+	if err != nil {
+		log.Println("Failed to create zip entry for converted file:", err)
+		return
+	}
+
+	_, err = entry.Write(fileBytes)
+	if err != nil {
+		log.Println("Failed to write converted file to zip:", err)
+		return
 	}
 }
 
