@@ -34,6 +34,11 @@ var (
 	}
 )
 
+type ArchiveRequest struct {
+	Id     []string `json:"id"`
+	Format string   `json:"format,omitempty"`
+}
+
 type RestService struct {
 	listen     string
 	apiPrefix  string
@@ -98,8 +103,16 @@ func (service RestService) registerBookResource(container *restful.Container) {
 		To(service.downloadBooksArchive).
 		Doc("Download books in single zip file").
 		Operation("downloadBooksArchive").
-		Param(ws.QueryParameter("id", "comma-separated list of book id").DataType("string")).
+		Param(ws.QueryParameter("id", "comma-separated list of book ids").DataType("string")).
 		Param(ws.QueryParameter("format", "convert books to format: epub, azw3, mobi").DataType("string")).
+		Returns(200, "OK", orm.Book{}))
+
+	path.Route(ws.POST("/archive").
+		To(service.downloadBooksArchivePost).
+		Doc("Download books in single zip file").
+		Operation("downloadBooksArchivePost").
+		Consumes(restful.MIME_JSON).
+		Reads(ArchiveRequest{}, "JSON body with ids array and optional format").
 		Returns(200, "OK", orm.Book{}))
 
 	path.Route(ws.POST("/search").
@@ -279,56 +292,82 @@ func (service RestService) downloadBooksArchive(request *restful.Request, respon
 	format := request.QueryParameter("format")
 
 	if len(ids) > 0 {
-		// Validate format if provided
-		if format != "" {
-			if _, ok := allowedFormats[format]; !ok {
-				response.AddHeader("Content-Type", "text/plain")
-				response.WriteErrorString(http.StatusBadRequest, "Invalid format. Allowed formats: epub, azw3, mobi\n")
-				return
-			}
-		}
-
-		response.Header().Set("Content-Type", "application/zip")
-		response.Header().Set("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
-			"flibooks-"+time.Now().Format("2006-01-02T15-04-05")+".zip"), "+", "%20", -1))
-		zipWriter := zip.NewWriter(response)
-
-		idsChan := make(chan string)
-		done := make(chan bool)
-
-		go func() {
-			for {
-				id, more := <-idsChan
-				if more {
-					bookID, _ := strconv.ParseUint(id, 0, 32)
-					book, err := service.dataStore.GetBook(uint(bookID))
-					if err == nil {
-						if format != "" {
-							// Convert book to specified format
-							service.addConvertedBookToArchive(zipWriter, book, service.dataDir, format)
-						} else {
-							// Add original book to archive
-							service.addOriginalBookToArchive(zipWriter, book, service.dataDir)
-						}
-					} else {
-						log.Println("Failed to get book ", id)
-					}
-				} else {
-					done <- true
-					return
-				}
-			}
-		}()
-		for _, id := range ids {
-			idsChan <- id
-		}
-		close(idsChan)
-		<-done
-		zipWriter.Close()
+		service.downloadBooksArchiveInternal(ids, format, response)
 	} else {
 		response.AddHeader("Content-Type", "text/plain")
 		response.WriteErrorString(http.StatusBadRequest, "No parameters passed\n")
 	}
+}
+
+func (service RestService) downloadBooksArchivePost(request *restful.Request, response *restful.Response) {
+	var req ArchiveRequest
+	if err := request.ReadEntity(&req); err != nil {
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusBadRequest, "Invalid JSON: "+err.Error()+"\n")
+		return
+	}
+
+	if len(req.Id) == 0 {
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusBadRequest, "No IDs provided\n")
+		return
+	}
+
+	format := req.Format
+	if format == "" {
+		format = request.QueryParameter("format")
+	}
+
+	service.downloadBooksArchiveInternal(req.Id, format, response)
+}
+
+func (service RestService) downloadBooksArchiveInternal(ids []string, format string, response *restful.Response) {
+	// Validate format if provided
+	if format != "" {
+		if _, ok := allowedFormats[format]; !ok {
+			response.AddHeader("Content-Type", "text/plain")
+			response.WriteErrorString(http.StatusBadRequest, "Invalid format. Allowed formats: epub, azw3, mobi\n")
+			return
+		}
+	}
+
+	response.Header().Set("Content-Type", "application/zip")
+	response.Header().Set("Content-disposition", "attachment; filename*=UTF-8''"+strings.Replace(url.QueryEscape(
+		"flibooks-"+time.Now().Format("2006-01-02T15-04-05")+".zip"), "+", "%20", -1))
+	zipWriter := zip.NewWriter(response)
+
+	idsChan := make(chan string)
+	done := make(chan bool)
+
+	go func() {
+		for {
+			id, more := <-idsChan
+			if more {
+				bookID, _ := strconv.ParseUint(id, 0, 32)
+				book, err := service.dataStore.GetBook(uint(bookID))
+				if err == nil {
+					if format != "" {
+						// Convert book to specified format
+						service.addConvertedBookToArchive(zipWriter, book, service.dataDir, format)
+					} else {
+						// Add original book to archive
+						service.addOriginalBookToArchive(zipWriter, book, service.dataDir)
+					}
+				} else {
+					log.Println("Failed to get book ", id)
+				}
+			} else {
+				done <- true
+				return
+			}
+		}
+	}()
+	for _, id := range ids {
+		idsChan <- id
+	}
+	close(idsChan)
+	<-done
+	zipWriter.Close()
 }
 
 func (service RestService) addOriginalBookToArchive(zipWriter *zip.Writer, book *orm.Book, dataDir string) {
