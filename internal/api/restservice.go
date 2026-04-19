@@ -165,6 +165,13 @@ func (service RestService) registerAuthorResource(container *restful.Container) 
 		Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
 		Returns(200, "OK", []orm.Book{}))
 
+	path.Route(ws.POST("/books").
+		To(service.listAuthorsBooksPost).
+		Doc("Show author's books").
+		Operation("listAuthorsBooks").
+		Param(ws.PathParameter("authorId", "identifier of the author").DataType("int")).
+		Returns(200, "OK", []orm.Book{}))
+
 	path.Route(ws.POST("/search").
 		To(service.searchAuthors).
 		Doc("Search authors").
@@ -538,10 +545,14 @@ func (service RestService) listAuthorsBooks(request *restful.Request, response *
 }
 
 func (service RestService) listAuthorsBooksPost(request *restful.Request, response *restful.Response) {
-	authorId, _ := strconv.ParseUint(request.PathParameter("authorId"), 0, 32)
+	authorId, noAuthor := strconv.ParseUint(request.PathParameter("authorId"), 0, 32)
 	noDetails, _ := utils.ParseBool(request.QueryParameter("no-details"))
 	search := orm.Search{}
 	request.ReadEntity(&search)
+
+	if noAuthor != nil {
+		authorId, _ = strconv.ParseUint(search.Author, 0, 32)
+	}
 
 	log.Println("Requesting author's books ", authorId)
 

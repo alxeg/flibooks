@@ -165,7 +165,7 @@ func (store *dbStore) ListAuthorBooks(authorID uint, noDetails bool, params mode
 
 	search = addParams(search, params).Group("books.id")
 
-	search = search.Preload("Container")
+	search = search.Preload("Container").Preload("Genres")
 	if !noDetails {
 		search = search.Preload("Authors")
 	}
