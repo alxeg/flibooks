@@ -1,5 +1,5 @@
 
-FROM golang:1.24-alpine AS build
+FROM golang:1.26-alpine AS build
 
 ARG FB2C_VERSION=v1.78.5
 
