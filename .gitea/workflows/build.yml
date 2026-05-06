@@ -26,7 +26,7 @@ jobs:
       - name: Registry login
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.HARBOR_REGISTRY_URL }}
+          registry: ${{ vars.HARBOR_REGISTRY_URL }}
           username: ${{ secrets.HARBOR_USERNAME }}
           password: ${{ secrets.HARBOR_PASSWORD }}
 
@@ -37,9 +37,9 @@ jobs:
           file: ./Dockerfile
           push: ${{ github.event.inputs.push_image == 'true' }}
           tags: |
-            ${{ secrets.HARBOR_REGISTRY_URL }}/lab/flibooks:latest
-            ${{ secrets.HARBOR_REGISTRY_URL }}/lab/flibooks:${{ github.run_number }}
+            ${{ vars.HARBOR_REGISTRY_URL }}/lab/flibooks:latest
+            ${{ vars.HARBOR_REGISTRY_URL }}/lab/flibooks:${{ github.run_number }}
 
       - name: Registry logout
         if: always()
-        run: docker logout ${{ secrets.HARBOR_REGISTRY_URL }}
+        run: docker logout ${{ vars.HARBOR_REGISTRY_URL }}
