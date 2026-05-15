@@ -2,6 +2,7 @@
 FROM golang:1.26-alpine AS build
 
 ARG FB2C_VERSION=v1.78.5
+ARG FB2C_DOWNLOAD_URL=https://github.com/rupor-github/fb2converter/releases/download
 
 ARG TARGETARCH
 ARG TARGETOS
@@ -17,9 +18,9 @@ ADD         . /build
 
 RUN         mkdir -p /build/bin && cd /build && \
             go build -mod=vendor ./cmd/... && \
-            # curl -L "https://github.com/rupor-github/fb2converter/releases/download/${FB2C_VERSION}/fb2c-${TARGETOS}-${TARGETARCH}.zip" -o fb2c-${TARGETOS}-${TARGETARCH}.zip && \
-            unzip -d bin/ contrib/fb2c-${TARGETOS}-${TARGETARCH}.zip && \
-            # rm -rf fb2c-${TARGETOS}-${TARGETARCH}.zip && \
+            curl -L "${FB2C_DOWNLOAD_URL}/${FB2C_VERSION}/fb2c-${TARGETOS}-${TARGETARCH}.zip" -o fb2c-${TARGETOS}-${TARGETARCH}.zip && \
+            unzip -d bin/ fb2c-${TARGETOS}-${TARGETARCH}.zip && \
+            rm -rf fb2c-${TARGETOS}-${TARGETARCH}.zip && \
             echo Done!
 
 FROM alpine:3.23

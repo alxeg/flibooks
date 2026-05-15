@@ -36,9 +36,11 @@ jobs:
           context: .
           file: ./Dockerfile
           push: ${{ github.event.inputs.push_image == 'true' }}
+          build-args: |
+            FB2C_DOWNLOAD_URL=${{ vars.FB2C_DOWNLOAD_URL }}
           tags: |
             ${{ vars.HARBOR_REGISTRY_URL }}/lab/flibooks:latest
-            ${{ vars.HARBOR_REGISTRY_URL }}/lab/flibooks:${{ github.run_number }}
+            ${{ vars.HARBOR_REGISTRY_URL }}/lab/flibooks:${{ github.run_number }}-${{ github.sha }}
 
       - name: Registry logout
         if: always()
