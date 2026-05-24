@@ -17,4 +17,5 @@ type DataStorer interface {
 	GetBook(bookID uint) (*models.Book, error)
 	GetLangs() ([]string, error)
 	IsContainerExist(fileName string) bool
+	Ping() error
 }

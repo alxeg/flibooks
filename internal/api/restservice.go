@@ -565,6 +565,23 @@ func (service RestService) listAuthorsBooksPost(request *restful.Request, respon
 	}
 }
 
+func (service RestService) health(request *restful.Request, response *restful.Response) {
+	status := map[string]string{"status": "ok"}
+
+	if service.dataStore != nil {
+		if err := service.dataStore.Ping(); err != nil {
+			status["status"] = "error"
+			status["database"] = "unavailable"
+			response.WriteHeader(http.StatusServiceUnavailable)
+			response.WriteEntity(status)
+			return
+		}
+		status["database"] = "ok"
+	}
+
+	response.WriteEntity(status)
+}
+
 func (service RestService) StartListen() {
 	log.Println("Start listening on ", service.listen)
 	server := &http.Server{Addr: service.listen, Handler: service.container}
@@ -587,8 +604,10 @@ func NewRestService(listen, apiPrefix string, dataStore db.DataStorer, dataDir s
 
 	// static files
 	ws := new(restful.WebService)
+	ws.Path("/health").Produces(restful.MIME_JSON).Route(ws.GET("").To(service.health))
 	ws.Path(staticsRoute).Route(ws.GET("/").To(service.staticFromPathParam))
 	ws.Path(staticsRoute).Route(ws.GET("/{subpath:*}").To(service.staticFromPathParam))
+
 	service.container.Add(ws)
 
 	service.registerBookResource(service.container)

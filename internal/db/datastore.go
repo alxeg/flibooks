@@ -218,6 +218,17 @@ func (store *dbStore) IsContainerExist(fileName string) bool {
 	return contObj.ID > 0
 }
 
+func (store *dbStore) Ping() error {
+	if store.db == nil {
+		return errors.New("database not initialized")
+	}
+	db, err := store.db.DB()
+	if err != nil {
+		return err
+	}
+	return db.Ping()
+}
+
 // NewDBStore creates new instance of datastorer
 func NewDBStore(dbType, connect, logLevel string) (DataStorer, error) {
 	var dialector gorm.Dialector
